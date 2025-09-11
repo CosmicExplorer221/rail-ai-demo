@@ -6,6 +6,11 @@ export interface Event {
   confidence: number
   note: string
   videoUrl?: string
+  location: {
+    lat: number
+    lng: number
+    milepost: string
+  }
 }
 
 export interface Model {
@@ -34,6 +39,11 @@ export const mockEvents: Event[] = [
     type: 'RED_SIGNAL',
     confidence: 0.94,
     note: 'Red signal detected at Junction B-7',
+    location: {
+      lat: 52.5200,
+      lng: 13.4050,
+      milepost: 'KM 12+400'
+    }
   },
   {
     id: '2',
@@ -42,6 +52,11 @@ export const mockEvents: Event[] = [
     type: 'PERSON_IN_TRACK',
     confidence: 0.87,
     note: 'Person detected on track section 15',
+    location: {
+      lat: 52.5190,
+      lng: 13.4040,
+      milepost: 'KM 12+200'
+    }
   },
   {
     id: '3',
@@ -50,6 +65,11 @@ export const mockEvents: Event[] = [
     type: 'OBSTACLE',
     confidence: 0.91,
     note: 'Large object blocking track',
+    location: {
+      lat: 52.5180,
+      lng: 13.4030,
+      milepost: 'KM 12+000'
+    }
   },
   {
     id: '4',
@@ -58,6 +78,11 @@ export const mockEvents: Event[] = [
     type: 'SPEED_LIMIT',
     confidence: 0.82,
     note: 'Speed limit sign change detected',
+    location: {
+      lat: 52.5170,
+      lng: 13.4020,
+      milepost: 'KM 11+800'
+    }
   },
   {
     id: '5',
@@ -66,6 +91,11 @@ export const mockEvents: Event[] = [
     type: 'WARNING',
     confidence: 0.89,
     note: 'Track maintenance warning sign',
+    location: {
+      lat: 52.5160,
+      lng: 13.4010,
+      milepost: 'KM 11+600'
+    }
   },
 ]
 

@@ -7,7 +7,10 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git remote add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(claude --version)",
+      "Bash(claude --update)",
+      "Bash(claude update)"
     ],
     "deny": [],
     "ask": []

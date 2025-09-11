@@ -1,4 +1,4 @@
-import { AlertTriangle, Eye, CheckCircle } from 'lucide-react'
+import { AlertTriangle, Eye, CheckCircle, Clock, ChevronRight } from 'lucide-react'
 import { mockEvents } from '../data/mockData'
 
 const kpis = [
@@ -112,35 +112,70 @@ export function Dashboard() {
       <div className="card">
         <div className="p-6">
           <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>Recent Events</h3>
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.75rem'}}>
-            {recentEvents.map((event) => (
+          <div style={{display: 'flex', flexDirection: 'column', gap: '0px'}}>
+            {recentEvents.map((event, index) => (
               <div
                 key={event.id}
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   padding: '1rem',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '0.5rem',
+                  borderTop: index === 0 ? 'none' : '1px solid #f3f4f6',
                   cursor: 'pointer',
-                  transition: 'background-color 0.2s'
+                  transition: 'background-color 0.2s',
+                  borderRadius: index === 0 ? '0.5rem 0.5rem 0 0' : index === recentEvents.length - 1 ? '0 0 0.5rem 0.5rem' : '0'
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                <div style={{display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
-                  <EventTypeChip type={event.type} />
-                  <span style={{
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: '#111827',
-                    backgroundColor: '#f3f4f6',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '0.25rem'
-                  }}>
-                    {(event.confidence * 100).toFixed(0)}%
+                {/* Time indicator */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  minWidth: '140px',
+                  marginRight: '1rem'
+                }}>
+                  <Clock style={{width: '1rem', height: '1rem', color: '#9ca3af', marginRight: '0.5rem'}} />
+                  <span style={{fontSize: '0.875rem', color: '#6b7280', fontFamily: 'monospace'}}>
+                    {new Date(event.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <p style={{fontSize: '0.875rem', color: '#1f2937', fontWeight: '500', marginBottom: '0.25rem'}}>{event.note}</p>
-                <p style={{fontSize: '0.75rem', color: '#6b7280'}}>{event.timestamp}</p>
+
+                {/* Event info */}
+                <div style={{flex: '1', minWidth: '0'}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem'}}>
+                    <EventTypeChip type={event.type} />
+                    <span style={{
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      backgroundColor: '#f3f4f6',
+                      color: '#4b5563',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '0.25rem'
+                    }}>
+                      {(event.confidence * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <p style={{
+                    fontSize: '0.875rem', 
+                    color: '#1f2937', 
+                    fontWeight: '500',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {event.note}
+                  </p>
+                </div>
+
+                {/* Arrow indicator */}
+                <ChevronRight style={{
+                  width: '1.25rem', 
+                  height: '1.25rem', 
+                  color: '#d1d5db',
+                  marginLeft: '1rem',
+                  flexShrink: 0
+                }} />
               </div>
             ))}
           </div>
