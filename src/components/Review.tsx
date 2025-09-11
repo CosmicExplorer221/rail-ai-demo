@@ -372,7 +372,7 @@ export function Review() {
           const columns = []
           if (showVideo) columns.push('3fr')
           if (showMap) columns.push('2fr')  
-          columns.push('1fr', '1fr') // Events and Clips
+          columns.push('1fr') // Only Clips column
           return columns.join(' ')
         })(),
         gap: '2rem'
@@ -583,77 +583,92 @@ export function Review() {
 
         {/* Map Section */}
         {showMap && (
-          <Map 
-            selectedEvent={selectedEvent} 
-            onEventSelect={setSelectedEvent}
-            currentEvents={currentEvents}
-          />
-        )}
-
-        {/* Event List Sidebar */}
-        <div className="card">
-          <div className="p-6">
-            <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>All Events</h3>
-            <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '700px', overflowY: 'auto'}}>
-              {sortedEvents.map((event) => (
-                <button
-                  key={event.id}
-                  onClick={() => setSelectedEvent(event)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '1rem',
-                    borderRadius: '0.75rem',
-                    border: '1px solid',
-                    borderColor: selectedEvent.id === event.id ? '#bfdbfe' : '#e5e7eb',
-                    backgroundColor: selectedEvent.id === event.id ? '#eff6ff' : 'transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: selectedEvent.id === event.id ? '0 1px 2px 0 rgb(0 0 0 / 0.05)' : 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (selectedEvent.id !== event.id) {
-                      e.currentTarget.style.backgroundColor = '#f9fafb'
-                      e.currentTarget.style.boxShadow = '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedEvent.id !== event.id) {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                      e.currentTarget.style.boxShadow = 'none'
-                    }
-                  }}
-                >
-                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem'}}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                      <EventTypeChip type={event.type} />
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        color: '#4b5563',
-                        backgroundColor: '#f3f4f6',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.25rem'
-                      }}>
-                        {(event.confidence * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <ChevronRight style={{
-                      width: '1rem',
-                      height: '1rem',
-                      color: selectedEvent.id === event.id ? '#3b82f6' : '#9ca3af',
-                      transition: 'color 0.2s'
-                    }} />
-                  </div>
-                  <p style={{fontSize: '0.875rem', color: '#111827', marginBottom: '0.5rem', fontWeight: '500'}}>{event.note}</p>
-                  <p style={{fontSize: '0.75rem', color: '#6b7280'}}>
-                    Frame {event.frame} • {event.timestamp}
-                  </p>
-                </button>
-              ))}
+          <div>
+            <Map 
+              selectedEvent={selectedEvent} 
+              onEventSelect={setSelectedEvent}
+              currentEvents={currentEvents}
+            />
+            
+            {/* Event List Below Map */}
+            <div className="card" style={{ marginTop: '2rem' }}>
+              <div className="p-6">
+                <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>All Events</h3>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', maxHeight: '500px', overflowY: 'auto'}}>
+                  {sortedEvents.map((event) => (
+                    <button
+                      key={event.id}
+                      onClick={() => setSelectedEvent(event)}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0.375rem',
+                        border: '1px solid',
+                        borderColor: selectedEvent.id === event.id ? '#bfdbfe' : 'transparent',
+                        backgroundColor: selectedEvent.id === event.id ? '#eff6ff' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        fontSize: '0.875rem',
+                        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedEvent.id !== event.id) {
+                          e.currentTarget.style.backgroundColor = '#f9fafb'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedEvent.id !== event.id) {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }
+                      }}
+                    >
+                      <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          minWidth: '4rem'
+                        }}>
+                          {event.timestamp.split(' ')[1]}
+                        </span>
+                        <EventTypeChip type={event.type} />
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          color: '#4b5563',
+                          backgroundColor: selectedEvent.id === event.id ? '#dbeafe' : '#f3f4f6',
+                          padding: '0.125rem 0.375rem',
+                          borderRadius: '0.25rem',
+                          minWidth: '2.5rem',
+                          textAlign: 'center'
+                        }}>
+                          {(event.confidence * 100).toFixed(0)}%
+                        </span>
+                        <span style={{
+                          color: '#111827',
+                          flex: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {event.note}
+                        </span>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          color: '#9ca3af',
+                          minWidth: '4rem',
+                          textAlign: 'right'
+                        }}>
+                          #{event.frame}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Recent Clips Panel */}
         <div className="card">
@@ -772,6 +787,7 @@ export function Review() {
           </div>
         </div>
       </div>
+
     </div>
   )
 }

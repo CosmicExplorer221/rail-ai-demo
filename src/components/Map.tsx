@@ -111,6 +111,8 @@ function MapController({ selectedEvent, currentEvents }: { selectedEvent: Event,
 export function Map({ selectedEvent, onEventSelect, currentEvents }: MapProps) {
   const [trainPosition, setTrainPosition] = useState({ lat: 52.5160, lng: 13.4010 })
   const [showRailwayOverlay, setShowRailwayOverlay] = useState(true)
+  const [mapProvider, setMapProvider] = useState<'osm' | 'google'>('osm')
+  const [googleMapType, setGoogleMapType] = useState<'roadmap' | 'satellite'>('roadmap')
 
   // Create route from actual event coordinates
   const routePoints = useMemo(() => {
@@ -185,27 +187,109 @@ export function Map({ selectedEvent, onEventSelect, currentEvents }: MapProps) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
           <h3 className="text-xl font-semibold text-gray-900">Map & geo-pins</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button
-              onClick={() => setShowRailwayOverlay(!showRailwayOverlay)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.375rem',
-                border: '1px solid #d1d5db',
-                backgroundColor: showRailwayOverlay ? '#eff6ff' : 'white',
-                color: showRailwayOverlay ? '#1d4ed8' : '#6b7280',
-                fontSize: '0.75rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = showRailwayOverlay ? '#dbeafe' : '#f9fafb'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = showRailwayOverlay ? '#eff6ff' : 'white'}
-            >
-              OpenRailwayMap
-            </button>
+            {/* Map Provider Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                onClick={() => setMapProvider('osm')}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: mapProvider === 'osm' ? '#eff6ff' : 'white',
+                  color: mapProvider === 'osm' ? '#1d4ed8' : '#6b7280',
+                  fontSize: '0.75rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = mapProvider === 'osm' ? '#dbeafe' : '#f9fafb'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = mapProvider === 'osm' ? '#eff6ff' : 'white'}
+              >
+                OpenStreetMap
+              </button>
+              <button
+                onClick={() => setMapProvider('google')}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: mapProvider === 'google' ? '#eff6ff' : 'white',
+                  color: mapProvider === 'google' ? '#1d4ed8' : '#6b7280',
+                  fontSize: '0.75rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = mapProvider === 'google' ? '#dbeafe' : '#f9fafb'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = mapProvider === 'google' ? '#eff6ff' : 'white'}
+              >
+                Google Maps
+              </button>
+            </div>
+
+            {/* Google Maps Type Toggle */}
+            {mapProvider === 'google' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  onClick={() => setGoogleMapType('roadmap')}
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: googleMapType === 'roadmap' ? '#f0fdf4' : 'white',
+                    color: googleMapType === 'roadmap' ? '#166534' : '#6b7280',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Map
+                </button>
+                <button
+                  onClick={() => setGoogleMapType('satellite')}
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: googleMapType === 'satellite' ? '#f0fdf4' : 'white',
+                    color: googleMapType === 'satellite' ? '#166534' : '#6b7280',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Satellite
+                </button>
+              </div>
+            )}
+
+            {/* Railway Overlay Toggle (only for OpenStreetMap) */}
+            {mapProvider === 'osm' && (
+              <button
+                onClick={() => setShowRailwayOverlay(!showRailwayOverlay)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: showRailwayOverlay ? '#eff6ff' : 'white',
+                  color: showRailwayOverlay ? '#1d4ed8' : '#6b7280',
+                  fontSize: '0.75rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = showRailwayOverlay ? '#dbeafe' : '#f9fafb'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = showRailwayOverlay ? '#eff6ff' : 'white'}
+              >
+                Railway Overlay
+              </button>
+            )}
+
             <span style={{
               fontSize: '0.875rem',
               color: '#6b7280',
@@ -213,7 +297,7 @@ export function Map({ selectedEvent, onEventSelect, currentEvents }: MapProps) {
               padding: '0.25rem 0.75rem',
               borderRadius: '9999px'
             }}>
-              Interactive Leaflet Map • Real GPS coordinates
+              {mapProvider === 'google' ? 'Google Maps' : 'OpenStreetMap'} • Real GPS coordinates
             </span>
           </div>
         </div>
@@ -233,13 +317,23 @@ export function Map({ selectedEvent, onEventSelect, currentEvents }: MapProps) {
             scrollWheelZoom={true}
           >
             {/* Base tile layer */}
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
+            {mapProvider === 'osm' ? (
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+            ) : (
+              <TileLayer
+                attribution='&copy; Google Maps'
+                url={googleMapType === 'satellite' 
+                  ? "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+                  : "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                }
+              />
+            )}
 
-            {/* Railway overlay - using OpenRailwayMap */}
-            {showRailwayOverlay && (
+            {/* Railway overlay - using OpenRailwayMap (only for OpenStreetMap) */}
+            {mapProvider === 'osm' && showRailwayOverlay && (
               <TileLayer
                 attribution='&copy; <a href="https://www.openrailwaymap.org/">OpenRailwayMap</a>'
                 url="https://tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png"
