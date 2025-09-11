@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Play, Square, RotateCcw, ChevronRight, Calendar, Eye, EyeOff, Pause, PlayCircle, Map as MapIcon } from 'lucide-react'
-import { mockEvents } from '../data/mockData'
+import { mockEvents, videoDatasets, mockUploadBatches } from '../data/mockData'
 import { Map } from './Map'
 
 function EventTypeChip({ type }: { type: string }) {
@@ -41,49 +41,35 @@ function EventTypeChip({ type }: { type: string }) {
 
 export function Review() {
   const [fps, setFps] = useState(30)
-  const [selectedEvent, setSelectedEvent] = useState(mockEvents[0])
+  const [currentVideoFile, setCurrentVideoFile] = useState('lineA_km12+400_frontcab.mp4')
+  const [currentEvents, setCurrentEvents] = useState(videoDatasets[currentVideoFile] || mockEvents)
+  const [selectedEvent, setSelectedEvent] = useState(currentEvents[0])
   const [isPlaying, setIsPlaying] = useState(false)
   const [showVideo, setShowVideo] = useState(false)
   const [showMap, setShowMap] = useState(true)
   const [timelineIsPlaying, setTimelineIsPlaying] = useState(false)
-  const [currentVideoFile, setCurrentVideoFile] = useState('lineA_km12+400_frontcab.mp4')
   const [videoResolution] = useState('1920x1080')
   const [videoFps] = useState('30 fps')
 
-  // Mock video clips data
-  const [recentClips] = useState([
-    {
-      id: 1,
-      name: 'lineA_km12+400_frontcab.mp4',
-      duration: '01:42',
-      resolution: '1920x1080',
-      fps: '30 fps',
-      status: 'processing',
-      isActive: true
-    },
-    {
-      id: 2,
-      name: 'lineB_stationApproach_frontcab.mp4',
-      duration: '00:58',
-      resolution: '1920x1080',
-      fps: '30 fps',
-      status: 'completed',
-      isActive: false
-    },
-    {
-      id: 3,
-      name: 'yard_2025-09-08_0630.mp4',
-      duration: '00:37',
-      resolution: '3840x2160',
-      fps: '60 fps',
-      status: 'completed',
-      isActive: false
-    }
-  ])
+  // Get .mp4 files from uploads
+  const videoClips = useMemo(() => {
+    return mockUploadBatches
+      .filter(batch => batch.type === 'MP4')
+      .map(batch => ({
+        id: batch.id,
+        name: batch.name,
+        duration: batch.name.includes('yard') ? '00:37' : batch.name.includes('stationApproach') ? '00:58' : '01:42',
+        resolution: batch.name.includes('yard') ? '3840x2160' : '1920x1080',
+        fps: batch.name.includes('yard') ? '60 fps' : '30 fps',
+        status: batch.status.toLowerCase(),
+        size: batch.size,
+        uploadDate: batch.uploadDate
+      }))
+  }, [])
 
   // Sort events chronologically and calculate timeline positions
   const sortedEvents = useMemo(() => {
-    const sorted = [...mockEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    const sorted = [...currentEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     
     // Calculate relative positions (0-100) based on time
     if (sorted.length > 1) {
@@ -98,7 +84,7 @@ export function Review() {
     }
     
     return sorted.map(event => ({ ...event, timelinePosition: 50 }))
-  }, [])
+  }, [currentEvents])
 
   const handleTimelineClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -116,8 +102,13 @@ export function Review() {
 
   const handleClipSelection = (clip: any) => {
     setCurrentVideoFile(clip.name)
-    // Update the processing info based on selected clip
-    // In a real app, this would trigger new event loading for that video
+    // Get events for the selected video clip
+    const newEvents = videoDatasets[clip.name] || mockEvents
+    setCurrentEvents(newEvents)
+    // Set the first event of the new dataset as selected
+    if (newEvents.length > 0) {
+      setSelectedEvent(newEvents[0])
+    }
   }
 
   return (
@@ -595,6 +586,7 @@ export function Review() {
           <Map 
             selectedEvent={selectedEvent} 
             onEventSelect={setSelectedEvent}
+            currentEvents={currentEvents}
           />
         )}
 
@@ -666,9 +658,9 @@ export function Review() {
         {/* Recent Clips Panel */}
         <div className="card">
           <div className="p-6">
-            <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>Recent clips</h3>
+            <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>Video Uploads</h3>
             <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '700px', overflowY: 'auto'}}>
-              {recentClips.map((clip) => (
+              {videoClips.map((clip) => (
                 <button
                   key={clip.id}
                   onClick={() => handleClipSelection(clip)}
@@ -704,7 +696,14 @@ export function Review() {
                         fontSize: '0.75rem',
                         fontWeight: '500',
                         color: 'white',
-                        backgroundColor: clip.status === 'processing' ? '#10b981' : '#6b7280',
+                        backgroundColor: (() => {
+                          switch(clip.status) {
+                            case 'completed': return '#10b981'
+                            case 'processing': return '#f59e0b'
+                            case 'failed': return '#dc2626'
+                            default: return '#6b7280'
+                          }
+                        })(),
                         padding: '0.25rem 0.5rem',
                         borderRadius: '0.25rem',
                         textTransform: 'capitalize'
@@ -736,6 +735,10 @@ export function Review() {
                     <span>{clip.duration}</span>
                     <span>{clip.resolution}</span>
                     <span>{clip.fps}</span>
+                    <span>{clip.size}</span>
+                  </div>
+                  <div style={{fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem'}}>
+                    Uploaded: {new Date(clip.uploadDate).toLocaleDateString()}
                   </div>
                 </button>
               ))}
@@ -757,11 +760,11 @@ export function Review() {
                 }}>ℹ️</span>
                 <div>
                   <h4 style={{fontSize: '0.875rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem'}}>
-                    Heads up
+                    Video Uploads ({videoClips.length} files)
                   </h4>
                   <p style={{fontSize: '0.875rem', color: '#4b5563', lineHeight: '1.4'}}>
-                    This MVP streams random detections for demo and maps them to a synthetic route. 
-                    Wire to GPS/IMU + detector API for real data.
+                    Select any completed video upload to view its detected events on the timeline and map. 
+                    Only .mp4 files from the uploads section are shown.
                   </p>
                 </div>
               </div>

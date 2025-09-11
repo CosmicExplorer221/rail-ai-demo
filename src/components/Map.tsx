@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet'
+import { useState, useEffect, useMemo } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { mockEvents, type Event } from '../data/mockData'
+import { type Event } from '../data/mockData'
 
 // Fix for default markers not showing in React-Leaflet
 import 'leaflet/dist/leaflet.css'
@@ -48,6 +48,7 @@ const createTrainIcon = () => {
 interface MapProps {
   selectedEvent: Event
   onEventSelect: (event: Event) => void
+  currentEvents: Event[]
   timelinePosition?: number
 }
 
@@ -69,7 +70,7 @@ function getEventMarkerColor(eventType: Event['type']) {
 }
 
 // Component to handle map events and centering
-function MapController({ selectedEvent, onEventSelect }: { selectedEvent: Event, onEventSelect: (event: Event) => void }) {
+function MapController({ selectedEvent, currentEvents }: { selectedEvent: Event, currentEvents: Event[] }) {
   const map = useMap()
 
   useEffect(() => {
@@ -81,21 +82,77 @@ function MapController({ selectedEvent, onEventSelect }: { selectedEvent: Event,
     }
   }, [selectedEvent, map])
 
+  // Auto-scale map to fit all current events
+  useEffect(() => {
+    if (currentEvents.length > 0) {
+      const coordinates: [number, number][] = currentEvents.map(event => [
+        event.location.lat,
+        event.location.lng
+      ])
+      
+      if (coordinates.length === 1) {
+        // Single point - center on it with reasonable zoom
+        map.setView(coordinates[0], 14, { animate: true, duration: 1 })
+      } else {
+        // Multiple points - fit bounds with padding
+        const bounds = L.latLngBounds(coordinates)
+        map.fitBounds(bounds, { 
+          padding: [20, 20],
+          animate: true,
+          duration: 1
+        })
+      }
+    }
+  }, [currentEvents, map])
+
   return null
 }
 
-export function Map({ selectedEvent, onEventSelect }: MapProps) {
+export function Map({ selectedEvent, onEventSelect, currentEvents }: MapProps) {
   const [trainPosition, setTrainPosition] = useState({ lat: 52.5160, lng: 13.4010 })
   const [showRailwayOverlay, setShowRailwayOverlay] = useState(true)
 
-  // Calculate the route path (simplified linear route)
-  const routePoints: [number, number][] = [
-    [52.5160, 13.4010], // Start
-    [52.5170, 13.4020],
-    [52.5180, 13.4030],
-    [52.5190, 13.4040],
-    [52.5200, 13.4050], // End
-  ]
+  // Create route from actual event coordinates
+  const routePoints = useMemo(() => {
+    if (currentEvents.length === 0) {
+      return []
+    }
+
+    // Sort events by timestamp to create chronological route
+    const sortedEvents = [...currentEvents].sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    )
+
+    // Create route points from actual event coordinates
+    const eventPoints: [number, number][] = sortedEvents.map(event => [
+      event.location.lat,
+      event.location.lng
+    ])
+
+    // Add intermediate points between events for smoother curves
+    const routeWithIntermediates: [number, number][] = []
+    
+    for (let i = 0; i < eventPoints.length; i++) {
+      routeWithIntermediates.push(eventPoints[i])
+      
+      // Add intermediate point between this and next event
+      if (i < eventPoints.length - 1) {
+        const currentPoint = eventPoints[i]
+        const nextPoint = eventPoints[i + 1]
+        
+        // Calculate midpoint with slight curve
+        const midLat = (currentPoint[0] + nextPoint[0]) / 2
+        const midLng = (currentPoint[1] + nextPoint[1]) / 2
+        
+        // Add small random offset for more natural curve (±0.0005 degrees)
+        const curveOffset = (Math.random() - 0.5) * 0.001
+        routeWithIntermediates.push([midLat + curveOffset, midLng + curveOffset])
+      }
+    }
+
+    console.log(`🛤️ Created route from ${sortedEvents.length} events with ${routeWithIntermediates.length} total points`)
+    return routeWithIntermediates
+  }, [currentEvents])
 
   // Update train position based on selected event
   useEffect(() => {
@@ -107,9 +164,20 @@ export function Map({ selectedEvent, onEventSelect }: MapProps) {
     }
   }, [selectedEvent])
 
-  // Calculate center point for initial map view
-  const centerLat = (52.5160 + 52.5200) / 2
-  const centerLng = (13.4010 + 13.4050) / 2
+  // Calculate center point for initial map view based on current route
+  const { centerLat, centerLng } = useMemo(() => {
+    if (routePoints.length === 0) {
+      return { centerLat: 52.5160, centerLng: 13.4010 }
+    }
+    
+    const lats = routePoints.map(point => point[0])
+    const lngs = routePoints.map(point => point[1])
+    
+    return {
+      centerLat: (Math.min(...lats) + Math.max(...lats)) / 2,
+      centerLng: (Math.min(...lngs) + Math.max(...lngs)) / 2
+    }
+  }, [routePoints])
 
   return (
     <div className="card" style={{ height: '600px' }}>
@@ -180,18 +248,20 @@ export function Map({ selectedEvent, onEventSelect }: MapProps) {
             )}
 
             {/* Route polyline */}
-            <Polyline
-              positions={routePoints}
-              pathOptions={{
-                color: '#64748b',
-                weight: 4,
-                opacity: 0.8,
-                dashArray: '10, 10'
-              }}
-            />
+            {routePoints.length > 0 && (
+              <Polyline
+                positions={routePoints}
+                pathOptions={{
+                  color: '#3b82f6',
+                  weight: 6,
+                  opacity: 0.9,
+                  dashArray: '15, 8'
+                }}
+              />
+            )}
 
             {/* Event markers */}
-            {mockEvents.map((event) => {
+            {currentEvents.map((event) => {
               const isSelected = selectedEvent?.id === event.id
               return (
                 <Marker
@@ -242,7 +312,7 @@ export function Map({ selectedEvent, onEventSelect }: MapProps) {
             )}
 
             {/* Map controller for handling events */}
-            <MapController selectedEvent={selectedEvent} onEventSelect={onEventSelect} />
+            <MapController selectedEvent={selectedEvent} currentEvents={currentEvents} />
           </MapContainer>
         </div>
 
