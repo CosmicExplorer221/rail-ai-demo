@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Calendar, Filter, Clock, AlertTriangle, Eye, MapPin, Zap } from 'lucide-react'
-import { mockEvents, type Event } from '../data/mockData'
+import { mockEvents } from '../data/mockData'
 
 function EventTypeChip({ type }: { type: string }) {
   const getChipStyle = (type: string) => {
@@ -245,7 +245,7 @@ export function Timeline() {
 
               {/* Timeline Events */}
               <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-                {filteredEvents.map((event, index) => (
+                {filteredEvents.map((event) => (
                   <div key={event.id} style={{position: 'relative', display: 'flex', gap: '1.5rem'}}>
                     {/* Event Icon */}
                     <div style={{position: 'relative', zIndex: 10}}>
@@ -266,7 +266,6 @@ export function Timeline() {
                             <span style={{
                               fontSize: '0.875rem',
                               fontWeight: '600',
-                              color: '#111827',
                               backgroundColor: '#eff6ff',
                               color: '#1d4ed8',
                               padding: '0.25rem 0.75rem',

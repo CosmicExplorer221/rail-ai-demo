@@ -64,7 +64,6 @@ export function Review() {
                   <span style={{
                     fontSize: '0.875rem',
                     fontWeight: '600',
-                    color: '#111827',
                     backgroundColor: '#eff6ff',
                     color: '#1d4ed8',
                     padding: '0.25rem 0.75rem',

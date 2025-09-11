@@ -6,11 +6,6 @@ import {
   Settings, 
   Train
 } from 'lucide-react'
-import { cn } from '../lib/utils'
-
-interface LayoutProps {
-  children: React.ReactNode
-}
 
 const navigation = [
   { name: 'Dashboard', icon: LayoutDashboard, id: 'dashboard' },
