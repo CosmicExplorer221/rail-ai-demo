@@ -10,7 +10,8 @@
       "Bash(git push:*)",
       "Bash(claude --version)",
       "Bash(claude --update)",
-      "Bash(claude update)"
+      "Bash(claude update)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

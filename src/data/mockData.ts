@@ -1,3 +1,6 @@
+import type { GeoPoint, RouteMetrics } from '../utils/routeGeometry'
+import { computeRouteMetrics, alignEventWithRoute } from '../utils/routeGeometry'
+
 export interface Event {
   id: string
   timestamp: string
@@ -11,6 +14,15 @@ export interface Event {
     lng: number
     milepost: string
   }
+  // New fields for smooth interpolation
+  timeRatio?: number // Position as ratio (0-1) along the route
+}
+
+export interface RouteDefinition {
+  name: string
+  waypoints: GeoPoint[]
+  totalDuration: number // Total journey time in seconds
+  metrics?: RouteMetrics // Computed route metrics
 }
 
 export interface Model {
@@ -34,26 +46,26 @@ export interface UploadBatch {
 // Dataset for lineA_km12+400_frontcab.mp4
 // Berlin to Hamburg Railway Journey (280km) - 20 detection events
 export const lineAEvents: Event[] = [
-  { id: 'la1', timestamp: '2024-01-15 08:00:00', frame: 100, type: 'WARNING', confidence: 0.92, note: 'Departure from Berlin Hauptbahnhof', location: { lat: 52.5251, lng: 13.3694, milepost: 'KM 0+000' } },
-  { id: 'la2', timestamp: '2024-01-15 08:12:15', frame: 2240, type: 'SPEED_LIMIT', confidence: 0.88, note: 'City speed limit 60 km/h', location: { lat: 52.5800, lng: 13.3200, milepost: 'KM 15+200' } },
-  { id: 'la3', timestamp: '2024-01-15 08:25:30', frame: 4680, type: 'PERSON_IN_TRACK', confidence: 0.91, note: 'Track worker at suburban crossing', location: { lat: 52.6500, lng: 13.2400, milepost: 'KM 28+600' } },
-  { id: 'la4', timestamp: '2024-01-15 08:35:45', frame: 6420, type: 'RED_SIGNAL', confidence: 0.95, note: 'Signal stop before Oranienburg', location: { lat: 52.7500, lng: 13.2300, milepost: 'KM 42+800' } },
-  { id: 'la5', timestamp: '2024-01-15 08:48:00', frame: 8640, type: 'OBSTACLE', confidence: 0.87, note: 'Fallen tree branch on track', location: { lat: 52.8200, lng: 13.1800, milepost: 'KM 55+400' } },
-  { id: 'la6', timestamp: '2024-01-15 09:05:20', frame: 11280, type: 'WARNING', confidence: 0.84, note: 'Wildlife crossing zone', location: { lat: 52.9000, lng: 13.0500, milepost: 'KM 68+200' } },
-  { id: 'la7', timestamp: '2024-01-15 09:18:35', frame: 13860, type: 'SPEED_LIMIT', confidence: 0.90, note: 'High speed section 200 km/h', location: { lat: 53.0200, lng: 12.9200, milepost: 'KM 82+600' } },
-  { id: 'la8', timestamp: '2024-01-15 09:28:50', frame: 16020, type: 'PERSON_IN_TRACK', confidence: 0.78, note: 'Maintenance crew near Wittenberge', location: { lat: 53.0800, lng: 12.8000, milepost: 'KM 95+800' } },
-  { id: 'la9', timestamp: '2024-01-15 09:42:10', frame: 18840, type: 'RED_SIGNAL', confidence: 0.93, note: 'Junction signal at Ludwigslust', location: { lat: 53.3200, lng: 11.4900, milepost: 'KM 125+400' } },
-  { id: 'la10', timestamp: '2024-01-15 09:55:25', frame: 21480, type: 'WARNING', confidence: 0.85, note: 'Bridge construction ahead', location: { lat: 53.4500, lng: 11.1200, milepost: 'KM 142+200' } },
-  { id: 'la11', timestamp: '2024-01-15 10:08:40', frame: 24120, type: 'OBSTACLE', confidence: 0.89, note: 'Freight train on parallel track', location: { lat: 53.5800, lng: 10.7800, milepost: 'KM 158+600' } },
-  { id: 'la12', timestamp: '2024-01-15 10:20:55', frame: 26580, type: 'SPEED_LIMIT', confidence: 0.86, note: 'Approach to Schwerin - 120 km/h', location: { lat: 53.6300, lng: 11.4100, milepost: 'KM 172+800' } },
-  { id: 'la13', timestamp: '2024-01-15 10:35:10', frame: 29340, type: 'PERSON_IN_TRACK', confidence: 0.82, note: 'Station platform worker', location: { lat: 53.6350, lng: 11.4200, milepost: 'KM 175+200' } },
-  { id: 'la14', timestamp: '2024-01-15 10:48:25', frame: 31980, type: 'WARNING', confidence: 0.88, note: 'Weather warning - heavy rain', location: { lat: 53.7200, lng: 10.9800, milepost: 'KM 192+400' } },
-  { id: 'la15', timestamp: '2024-01-15 11:02:40', frame: 34620, type: 'RED_SIGNAL', confidence: 0.91, note: 'Signal delay at Büchen', location: { lat: 53.4800, lng: 10.6200, milepost: 'KM 208+600' } },
-  { id: 'la16', timestamp: '2024-01-15 11:15:55', frame: 37260, type: 'OBSTACLE', confidence: 0.85, note: 'Construction vehicle near track', location: { lat: 53.5500, lng: 10.4200, milepost: 'KM 222+800' } },
-  { id: 'la17', timestamp: '2024-01-15 11:28:10', frame: 39900, type: 'SPEED_LIMIT', confidence: 0.89, note: 'Urban approach Hamburg 80 km/h', location: { lat: 53.6000, lng: 10.2500, milepost: 'KM 235+400' } },
-  { id: 'la18', timestamp: '2024-01-15 11:38:25', frame: 42060, type: 'PERSON_IN_TRACK', confidence: 0.87, note: 'Platform preparation Hamburg-Harburg', location: { lat: 53.4500, lng: 9.9800, milepost: 'KM 248+200' } },
-  { id: 'la19', timestamp: '2024-01-15 11:48:40', frame: 44220, type: 'WARNING', confidence: 0.83, note: 'Dense urban traffic crossing', location: { lat: 53.5200, lng: 9.9500, milepost: 'KM 258+600' } },
-  { id: 'la20', timestamp: '2024-01-15 11:58:55', frame: 46380, type: 'RED_SIGNAL', confidence: 0.94, note: 'Final approach Hamburg Hauptbahnhof', location: { lat: 53.5530, lng: 10.0070, milepost: 'KM 275+800' } }
+  { id: 'la1', timestamp: '2024-01-15 08:00:00', frame: 100, type: 'WARNING', confidence: 0.92, note: 'Departure from Berlin Hauptbahnhof', location: { lat: 52.5251, lng: 13.3694, milepost: 'KM 0+000' }, timeRatio: 0.0 },
+  { id: 'la2', timestamp: '2024-01-15 08:12:15', frame: 2240, type: 'SPEED_LIMIT', confidence: 0.88, note: 'City speed limit 60 km/h', location: { lat: 52.5800, lng: 13.3200, milepost: 'KM 15+200' }, timeRatio: 0.085 },
+  { id: 'la3', timestamp: '2024-01-15 08:25:30', frame: 4680, type: 'PERSON_IN_TRACK', confidence: 0.91, note: 'Track worker at suburban crossing', location: { lat: 52.6500, lng: 13.2400, milepost: 'KM 28+600' }, timeRatio: 0.178 },
+  { id: 'la4', timestamp: '2024-01-15 08:35:45', frame: 6420, type: 'RED_SIGNAL', confidence: 0.95, note: 'Signal stop before Oranienburg', location: { lat: 52.7500, lng: 13.2300, milepost: 'KM 42+800' }, timeRatio: 0.249 },
+  { id: 'la5', timestamp: '2024-01-15 08:48:00', frame: 8640, type: 'OBSTACLE', confidence: 0.87, note: 'Fallen tree branch on track', location: { lat: 52.8200, lng: 13.1800, milepost: 'KM 55+400' }, timeRatio: 0.335 },
+  { id: 'la6', timestamp: '2024-01-15 09:05:20', frame: 11280, type: 'WARNING', confidence: 0.84, note: 'Wildlife crossing zone', location: { lat: 52.9000, lng: 13.0500, milepost: 'KM 68+200' }, timeRatio: 0.456 },
+  { id: 'la7', timestamp: '2024-01-15 09:18:35', frame: 13860, type: 'SPEED_LIMIT', confidence: 0.90, note: 'High speed section 200 km/h', location: { lat: 53.0200, lng: 12.9200, milepost: 'KM 82+600' }, timeRatio: 0.548 },
+  { id: 'la8', timestamp: '2024-01-15 09:28:50', frame: 16020, type: 'PERSON_IN_TRACK', confidence: 0.78, note: 'Maintenance crew near Wittenberge', location: { lat: 53.0800, lng: 12.8000, milepost: 'KM 95+800' }, timeRatio: 0.620 },
+  { id: 'la9', timestamp: '2024-01-15 09:42:10', frame: 18840, type: 'RED_SIGNAL', confidence: 0.93, note: 'Junction signal at Ludwigslust', location: { lat: 53.3200, lng: 11.4900, milepost: 'KM 125+400' }, timeRatio: 0.713 },
+  { id: 'la10', timestamp: '2024-01-15 09:55:25', frame: 21480, type: 'WARNING', confidence: 0.85, note: 'Bridge construction ahead', location: { lat: 53.4500, lng: 11.1200, milepost: 'KM 142+200' }, timeRatio: 0.806 },
+  { id: 'la11', timestamp: '2024-01-15 10:08:40', frame: 24120, type: 'OBSTACLE', confidence: 0.89, note: 'Freight train on parallel track', location: { lat: 53.5800, lng: 10.7800, milepost: 'KM 158+600' }, timeRatio: 0.899 },
+  { id: 'la12', timestamp: '2024-01-15 10:20:55', frame: 26580, type: 'SPEED_LIMIT', confidence: 0.86, note: 'Approach to Schwerin - 120 km/h', location: { lat: 53.6300, lng: 11.4100, milepost: 'KM 172+800' }, timeRatio: 0.585 },
+  { id: 'la13', timestamp: '2024-01-15 10:35:10', frame: 29340, type: 'PERSON_IN_TRACK', confidence: 0.82, note: 'Station platform worker', location: { lat: 53.6350, lng: 11.4200, milepost: 'KM 175+200' }, timeRatio: 0.644 },
+  { id: 'la14', timestamp: '2024-01-15 10:48:25', frame: 31980, type: 'WARNING', confidence: 0.88, note: 'Weather warning - heavy rain', location: { lat: 53.7200, lng: 10.9800, milepost: 'KM 192+400' }, timeRatio: 0.700 },
+  { id: 'la15', timestamp: '2024-01-15 11:02:40', frame: 34620, type: 'RED_SIGNAL', confidence: 0.91, note: 'Signal delay at Büchen', location: { lat: 53.4800, lng: 10.6200, milepost: 'KM 208+600' }, timeRatio: 0.758 },
+  { id: 'la16', timestamp: '2024-01-15 11:15:55', frame: 37260, type: 'OBSTACLE', confidence: 0.85, note: 'Construction vehicle near track', location: { lat: 53.5500, lng: 10.4200, milepost: 'KM 222+800' }, timeRatio: 0.814 },
+  { id: 'la17', timestamp: '2024-01-15 11:28:10', frame: 39900, type: 'SPEED_LIMIT', confidence: 0.89, note: 'Urban approach Hamburg 80 km/h', location: { lat: 53.6000, lng: 10.2500, milepost: 'KM 235+400' }, timeRatio: 0.866 },
+  { id: 'la18', timestamp: '2024-01-15 11:38:25', frame: 42060, type: 'PERSON_IN_TRACK', confidence: 0.87, note: 'Platform preparation Hamburg-Harburg', location: { lat: 53.4500, lng: 9.9800, milepost: 'KM 248+200' }, timeRatio: 0.908 },
+  { id: 'la19', timestamp: '2024-01-15 11:48:40', frame: 44220, type: 'WARNING', confidence: 0.83, note: 'Dense urban traffic crossing', location: { lat: 53.5200, lng: 9.9500, milepost: 'KM 258+600' }, timeRatio: 0.951 },
+  { id: 'la20', timestamp: '2024-01-15 11:58:55', frame: 46380, type: 'RED_SIGNAL', confidence: 0.94, note: 'Final approach Hamburg Hauptbahnhof', location: { lat: 53.5530, lng: 10.0070, milepost: 'KM 275+800' }, timeRatio: 0.994 }
 ]
 
 // Munich to Berlin High-Speed Railway Journey (580km) - 25 detection events
@@ -253,82 +265,163 @@ export const videoDatasets: Record<string, Event[]> = {
   'night_freight_corridor_east.mp4': nightFreightEvents,
 }
 
-// Route definitions for each dataset with more distinctive curves and spacing
-export const routeDefinitions: Record<string, [number, number][]> = {
-  'lineA_km12+400_frontcab.mp4': [
-    [52.5160, 13.4010], // Start before KM 11+600
-    [52.5168, 13.4012], // Slight curve left
-    [52.5170, 13.4020], // KM 11+800 (Speed limit event)
-    [52.5175, 13.4035], // Curve right 
-    [52.5180, 13.4030], // KM 12+000 (Obstacle event)
-    [52.5188, 13.4025], // Sharp curve left
-    [52.5190, 13.4040], // KM 12+200 (Person in track)
-    [52.5195, 13.4055], // Curve right again
-    [52.5200, 13.4050], // KM 12+400 (Red signal event)
-    [52.5205, 13.4060]  // End with final curve
-  ],
-  'lineB_stationApproach_frontcab.mp4': [
-    [52.5240, 13.3970], // Start before station
-    [52.5245, 13.3960], // Wide curve left
-    [52.5250, 13.3980], // KM 15+200 (Speed limit) - curve back right
-    [52.5258, 13.3975], // Station approach curve
-    [52.5260, 13.3990], // KM 15+400 (Platform worker)
-    [52.5268, 13.4005], // Platform curve
-    [52.5270, 13.4000], // KM 15+600 (Station signal) - curve back
-    [52.5272, 13.4015], // Platform area curve
-    [52.5275, 13.4005], // KM 15+700 (Platform warning) - S-curve
-    [52.5278, 13.4020], // Wide platform curve
-    [52.5280, 13.4010], // KM 15+800 (Luggage cart) - curve back
-    [52.5283, 13.4025], // Departure preparation
-    [52.5285, 13.4015], // KM 15+900 (Passenger crossing) - final curve
-    [52.5290, 13.4035]  // Station departure - wide exit curve
-  ],
-  'yard_2025-09-08_0630.mp4': [
-    [52.5090, 13.4190], // Yard entrance
-    [52.5092, 13.4180], // Sharp entry curve left  
-    [52.5100, 13.4200], // YARD-T3+150 (Maintenance equipment)
-    [52.5105, 13.4190], // Switch curve left
-    [52.5110, 13.4210], // YARD-T3+300 (Yard worker)
-    [52.5118, 13.4205], // Track switching curve
-    [52.5120, 13.4220], // YARD-T3+450 (Shunting signal)
-    [52.5125, 13.4215], // Curve for parallel track
-    [52.5130, 13.4235], // YARD-T3+600 (Warning)
-    [52.5138, 13.4230], // Switch to track 4
-    [52.5140, 13.4245], // YARD-T3+750 (Speed limit)
-    [52.5148, 13.4240], // Parallel track curve
-    [52.5150, 13.4255], // YARD-T3+900 (Empty car)
-    [52.5158, 13.4250], // Final switch curve
-    [52.5160, 13.4265], // YARD-T4+050 (Signal operator)
-    [52.5168, 13.4260], // Exit preparation
-    [52.5170, 13.4275]  // Yard exit curve
-  ],
-  'morning_commute_berlin_hauptbahnhof.mp4': [
-    [52.5240, 13.3680], // Approach Berlin Hauptbahnhof
-    [52.5243, 13.3670], // Sharp approach curve left
-    [52.5250, 13.3690], // BERLIN-HBF+100 (Commuter) - curve right
-    [52.5252, 13.3680], // Platform area curve left
-    [52.5255, 13.3695], // BERLIN-HBF+150 (Departure signal)
-    [52.5258, 13.3685], // Main station curve left
-    [52.5260, 13.3700], // BERLIN-HBF+200 (Speed limit) - curve right
-    [52.5262, 13.3710], // Wide departure curve
-    [52.5265, 13.3705], // BERLIN-HBF+250 (Traffic warning) - S-curve
-    [52.5270, 13.3720]  // Departure from station - final curve
-  ],
-  'night_freight_corridor_east.mp4': [
-    [52.4790, 13.5180], // Freight corridor start
-    [52.4792, 13.5160], // Initial curve left (dramatic)
-    [52.4800, 13.5200], // KM 45+800 (Container shifted) - sharp right
-    [52.4808, 13.5190], // Major curve left
-    [52.4810, 13.5220], // KM 46+200 (Freight signal) - curve right
-    [52.4815, 13.5210], // Freight curve correction left
-    [52.4820, 13.5240], // KM 46+600 (Speed limit in curve) - big curve right
-    [52.4828, 13.5230], // Sharp mountain curve left
-    [52.4830, 13.5260], // KM 47+000 (Maintenance crew) - curve right
-    [52.4838, 13.5250], // Long freight curve left
-    [52.4840, 13.5280], // KM 47+400 (Fog warning) - final big curve right
-    [52.4845, 13.5270], // Straightening out
-    [52.4850, 13.5300]  // End of corridor - wide exit
-  ]
+// Route definitions for each dataset with smooth interpolation
+export const routeDefinitions: Record<string, RouteDefinition> = {
+  'lineA_km12+400_frontcab.mp4': {
+    name: 'Berlin to Hamburg Railway Journey',
+    totalDuration: 14315, // 3h 58m 55s in seconds
+    waypoints: [
+      [52.5251, 13.3694], // Berlin Hauptbahnhof - Start
+      [52.5800, 13.3200], // KM 15+200
+      [52.6500, 13.2400], // KM 28+600
+      [52.7500, 13.2300], // KM 42+800 - Oranienburg
+      [52.8200, 13.1800], // KM 55+400
+      [52.9000, 13.0500], // KM 68+200 - Wildlife zone
+      [53.0200, 12.9200], // KM 82+600 - High speed section
+      [53.0800, 12.8000], // KM 95+800 - Wittenberge
+      [53.3200, 11.4900], // KM 125+400 - Ludwigslust junction
+      [53.4500, 11.1200], // KM 142+200 - Bridge construction
+      [53.5800, 10.7800], // KM 158+600
+      [53.6300, 11.4100], // KM 172+800 - Schwerin approach
+      [53.6350, 11.4200], // KM 175+200 - Station worker
+      [53.7200, 10.9800], // KM 192+400 - Weather warning
+      [53.4800, 10.6200], // KM 208+600 - Büchen
+      [53.5500, 10.4200], // KM 222+800 - Construction vehicle
+      [53.6000, 10.2500], // KM 235+400 - Hamburg approach
+      [53.4500, 9.9800],  // KM 248+200 - Hamburg-Harburg
+      [53.5200, 9.9500],  // KM 258+600 - Urban traffic
+      [53.5530, 10.0070]  // KM 275+800 - Hamburg Hauptbahnhof
+    ]
+  },
+  'lineB_stationApproach_frontcab.mp4': {
+    name: 'Munich to Berlin High-Speed Journey',
+    totalDuration: 21925, // 6h 5m 25s in seconds
+    waypoints: [
+      [48.1400, 11.5600], // Munich Hauptbahnhof - Start
+      [48.2500, 11.6200], // KM 22+400 - Urban exit
+      [48.7600, 11.4200], // KM 45+600 - Ingolstadt area
+      [48.7650, 11.4250], // KM 48+800 - Junction
+      [49.0400, 11.8700], // KM 78+200 - Agricultural area
+      [49.4500, 11.0800], // KM 115+400 - High-speed section
+      [49.7800, 10.9200], // KM 142+600 - Weather alert zone
+      [49.8900, 10.9000], // KM 168+800 - Bamberg area
+      [49.8980, 10.9050], // KM 172+200 - Station approach
+      [50.3200, 10.7800], // KM 215+400 - Construction area
+      [50.9800, 11.0300], // KM 258+600 - Erfurt approach
+      [50.9850, 11.0350], // KM 262+800 - Tunnel approach
+      [50.9720, 11.0370], // KM 267+200 - Station worker
+      [50.9750, 11.0400], // KM 270+400 - Departure signal
+      [51.3400, 11.5800], // KM 315+600 - Freight area
+      [51.7200, 11.9600], // KM 358+800 - High-speed corridor
+      [52.1300, 12.4200], // KM 402+200 - Animal crossing
+      [52.2800, 12.6500], // KM 435+400 - Signal maintenance
+      [51.8700, 12.6500], // KM 468+600 - Junction before Wittenberg
+      [52.0200, 12.8800], // KM 501+800 - Maintenance equipment
+      [52.3500, 13.1200], // KM 535+200 - Berlin approach
+      [52.4200, 13.2800], // KM 558+400 - Urban traffic
+      [52.4750, 13.3400], // KM 572+600 - Berlin Süd
+      [52.5200, 13.3650], // KM 578+800 - Final approach
+      [52.5251, 13.3694]  // KM 580+000 - Berlin Hauptbahnhof
+    ]
+  },
+  'yard_2025-09-08_0630.mp4': {
+    name: 'Rotterdam to Warsaw Trans-European Freight Corridor',
+    totalDuration: 29110, // 8h 5m 10s in seconds
+    waypoints: [
+      [51.9500, 4.0200],  // Rotterdam Maasvlakte Port - Start
+      [51.9200, 4.4800],  // KM 35+200 - Container area
+      [52.0800, 4.3100],  // KM 68+400 - Urban freight
+      [52.0900, 5.1200],  // KM 95+600 - Utrecht junction
+      [52.1600, 5.3900],  // KM 125+800 - Amersfoort
+      [52.2400, 6.8900],  // KM 185+200 - Netherlands-Germany border
+      [52.2200, 7.2100],  // KM 215+400 - Freight siding
+      [52.3700, 7.9200],  // KM 248+600 - German corridor
+      [52.2700, 8.0500],  // KM 275+800 - Osnabrück junction
+      [52.3700, 9.7400],  // KM 342+200 - Hannover yard
+      [52.4500, 10.1800], // KM 385+400 - Load distribution
+      [52.2700, 10.5200], // KM 418+600 - Braunschweig
+      [52.2400, 11.6200], // KM 485+800 - Speed reduction
+      [52.1200, 11.6300], // KM 512+200 - Magdeburg yard
+      [52.5200, 13.4100], // KM 595+400 - Berlin locomotive change
+      [52.3400, 14.5500], // KM 685+600 - Eastern corridor
+      [52.3500, 14.5500], // KM 712+800 - Frankfurt Oder customs
+      [52.3400, 14.6200], // KM 735+200 - Poland border
+      [52.2400, 15.2300], // KM 785+400 - Polish integration
+      [52.4100, 16.2200], // KM 825+600 - Track gauge check
+      [52.4100, 16.9200], // KM 865+800 - Poznań approach
+      [52.4000, 16.9300], // KM 885+200 - Switching locomotive
+      [52.1800, 18.4500], // KM 945+400 - Urban freight
+      [51.7600, 19.4600], // KM 985+600 - Łódź bypass
+      [52.0600, 20.6200], // KM 1045+800 - Warsaw approach
+      [52.1800, 20.9200], // KM 1078+200 - Metropolitan coordination
+      [52.2200, 20.9800], // KM 1105+400 - Freight yard switching
+      [52.2500, 21.0100], // KM 1135+600 - Warsaw Central approach
+      [52.2600, 21.0200], // KM 1148+800 - Terminal assignment
+      [52.2650, 21.0250]  // KM 1150+000 - Warsaw Freight Terminal
+    ]
+  },
+  'morning_commute_berlin_hauptbahnhof.mp4': {
+    name: 'Morning Commute Berlin Hauptbahnhof',
+    totalDuration: 345, // 5m 45s in seconds
+    waypoints: [
+      [52.5240, 13.3680], // Approach Berlin Hauptbahnhof
+      [52.5250, 13.3690], // BERLIN-HBF+100 - Commuter area
+      [52.5255, 13.3695], // BERLIN-HBF+150 - Departure signal
+      [52.5260, 13.3700], // BERLIN-HBF+200 - Speed limit
+      [52.5265, 13.3705], // BERLIN-HBF+250 - Traffic warning
+      [52.5270, 13.3720]  // Station departure
+    ]
+  },
+  'night_freight_corridor_east.mp4': {
+    name: 'Night Freight Corridor East',
+    totalDuration: 561, // 9m 21s in seconds
+    waypoints: [
+      [52.4780, 13.5150], // Freight corridor start - KM 45+800
+      [52.4820, 13.5200], // KM 46+200 - Freight signal
+      [52.4850, 13.5180], // KM 46+600 - Speed limit curve
+      [52.4870, 13.5250], // KM 47+000 - Maintenance crew
+      [52.4890, 13.5320]  // KM 47+400 - Fog warning end
+    ]
+  }
+}
+
+// Compute route metrics for all routes
+function initializeRouteMetrics(): void {
+  Object.keys(routeDefinitions).forEach(key => {
+    const route = routeDefinitions[key]
+    if (!route.metrics) {
+      route.metrics = computeRouteMetrics(route.waypoints)
+    }
+  })
+}
+
+// Initialize metrics on module load
+initializeRouteMetrics()
+
+/**
+ * Calculate time ratio for an event based on its timestamp within a journey
+ */
+function calculateTimeRatio(eventTimestamp: string, startTimestamp: string, totalDuration: number): number {
+  const eventTime = new Date(eventTimestamp).getTime()
+  const startTime = new Date(startTimestamp).getTime()
+  const elapsedSeconds = (eventTime - startTime) / 1000
+  return Math.max(0, Math.min(1, elapsedSeconds / totalDuration))
+}
+
+/**
+ * Get route definition for a video file
+ */
+export function getRouteForVideo(videoFile: string): RouteDefinition | undefined {
+  return routeDefinitions[videoFile]
+}
+
+/**
+ * Get smooth position for a time ratio along a route
+ */
+export function getPositionAtTime(videoFile: string, timeRatio: number): GeoPoint | undefined {
+  const route = routeDefinitions[videoFile]
+  if (!route?.metrics) return undefined
+  return route.metrics.pointAtRatio(timeRatio)
 }
 
 // Default events (backward compatibility)

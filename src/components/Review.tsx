@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { Play, Square, RotateCcw, ChevronRight, Calendar, Eye, EyeOff, Pause, PlayCircle, Map as MapIcon } from 'lucide-react'
-import { mockEvents, videoDatasets, mockUploadBatches } from '../data/mockData'
+import { mockEvents, videoDatasets, mockUploadBatches, getRouteForVideo } from '../data/mockData'
 import { Map } from './Map'
+import { useTicker } from '../hooks/useTicker'
 
 function EventTypeChip({ type }: { type: string }) {
   const getChipStyle = (type: string) => {
@@ -40,6 +41,34 @@ function EventTypeChip({ type }: { type: string }) {
 }
 
 export function Review() {
+  // Add CSS styles for the timeline slider
+  const sliderStyles = `
+    .timeline-slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      border: 2px solid #000;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .timeline-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.1);
+    }
+    .timeline-slider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      border: 2px solid #000;
+      cursor: pointer;
+    }
+    .timeline-slider::-moz-range-track {
+      height: 4px;
+      border-radius: 2px;
+    }
+  `
   const [fps, setFps] = useState(30)
   const [currentVideoFile, setCurrentVideoFile] = useState('lineA_km12+400_frontcab.mp4')
   const [currentEvents, setCurrentEvents] = useState(videoDatasets[currentVideoFile] || mockEvents)
@@ -48,8 +77,23 @@ export function Review() {
   const [showVideo, setShowVideo] = useState(false)
   const [showMap, setShowMap] = useState(true)
   const [timelineIsPlaying, setTimelineIsPlaying] = useState(false)
+  const [timelinePosition, setTimelinePosition] = useState(0) // Current position in seconds
   const [videoResolution] = useState('1920x1080')
   const [videoFps] = useState('30 fps')
+  
+  // Get route definition for current video
+  const currentRoute = useMemo(() => getRouteForVideo(currentVideoFile), [currentVideoFile])
+  
+  // Timeline animation using the custom hook
+  useTicker(timelineIsPlaying, (deltaTime) => {
+    if (!currentRoute) return
+    
+    setTimelinePosition(prev => {
+      const newPosition = prev + deltaTime
+      // Loop back to start when reaching the end
+      return newPosition >= currentRoute.totalDuration ? 0 : newPosition
+    })
+  })
 
   // Get .mp4 files from uploads
   const videoClips = useMemo(() => {
@@ -113,6 +157,9 @@ export function Review() {
 
   return (
     <div className="p-8">
+      {/* Inject custom CSS styles */}
+      <style dangerouslySetInnerHTML={{ __html: sliderStyles }} />
+      
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Event Review</h1>
         <p style={{marginTop: '0.5rem', fontSize: '1.125rem', color: '#4b5563'}}>Analyze detected events and validate AI predictions</p>
@@ -191,9 +238,9 @@ export function Review() {
             justifyContent: 'space-between',
             marginBottom: '1rem',
             padding: '0.75rem 1rem',
-            backgroundColor: '#f0f9ff',
+            backgroundColor: 'white',
             borderRadius: '0.5rem',
-            border: '1px solid #e0f2fe'
+            border: '1px solid #e5e7eb'
           }}>
             <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
               <span style={{fontSize: '0.875rem', color: '#0369a1', fontWeight: '500'}}>Now processing:</span>
@@ -214,50 +261,88 @@ export function Review() {
             </div>
           </div>
 
-          {/* Timeline Bar */}
+          {/* Unified Timeline with Progress and Events */}
           <div style={{marginBottom: '1rem'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem'}}>
-              <span>{sortedEvents.length > 0 ? new Date(sortedEvents[0].timestamp).toLocaleTimeString('en-US', { hour12: false }) : '00:00'}</span>
-              <span>24 Hours</span>
-              <span>{sortedEvents.length > 0 ? new Date(sortedEvents[sortedEvents.length - 1].timestamp).toLocaleTimeString('en-US', { hour12: false }) : '23:59'}</span>
+            {/* Timeline Header */}
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem'}}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                <span>{sortedEvents.length > 0 ? new Date(sortedEvents[0].timestamp).toLocaleTimeString('en-US', { hour12: false }) : '00:00'}</span>
+                <span style={{fontSize: '0.875rem', fontWeight: '600', color: '#111827'}}>
+                  {currentRoute ? `${Math.floor(timelinePosition / 60)}:${(Math.floor(timelinePosition) % 60).toString().padStart(2, '0')} / ${Math.floor(currentRoute.totalDuration / 60)}:${(Math.floor(currentRoute.totalDuration) % 60).toString().padStart(2, '0')}` : '0:00 / 0:00'}
+                </span>
+              </div>
+              <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                <span>{sortedEvents.length} events</span>
+                <span>{sortedEvents.length > 0 ? new Date(sortedEvents[sortedEvents.length - 1].timestamp).toLocaleTimeString('en-US', { hour12: false }) : '23:59'}</span>
+              </div>
             </div>
             
             <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-              {/* Timeline Play/Pause Button */}
+              {/* Play Button */}
               <button
-                onClick={() => setTimelineIsPlaying(!timelineIsPlaying)}
+                onClick={() => setTimelineIsPlaying(true)}
+                disabled={timelineIsPlaying}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: '3rem',
-                  height: '3rem',
-                  borderRadius: '50%',
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer',
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '0.375rem',
+                  backgroundColor: timelineIsPlaying ? '#f3f4f6' : '#000',
+                  color: timelineIsPlaying ? '#9ca3af' : 'white',
+                  border: '1px solid #e5e7eb',
+                  cursor: timelineIsPlaying ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s',
-                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                   flexShrink: 0
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2563eb'
-                  e.currentTarget.style.transform = 'scale(1.05)'
+                  if (!timelineIsPlaying) {
+                    e.currentTarget.style.backgroundColor = '#333'
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#3b82f6'
-                  e.currentTarget.style.transform = 'scale(1)'
+                  if (!timelineIsPlaying) {
+                    e.currentTarget.style.backgroundColor = '#000'
+                  }
                 }}
               >
-                {timelineIsPlaying ? (
-                  <Pause style={{width: '1.25rem', height: '1.25rem'}} />
-                ) : (
-                  <PlayCircle style={{width: '1.25rem', height: '1.25rem'}} />
-                )}
+                <Play style={{width: '1rem', height: '1rem'}} />
               </button>
               
-              {/* Timeline Track */}
+              {/* Stop Button */}
+              <button
+                onClick={() => setTimelineIsPlaying(false)}
+                disabled={!timelineIsPlaying}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '0.375rem',
+                  backgroundColor: !timelineIsPlaying ? '#f3f4f6' : '#000',
+                  color: !timelineIsPlaying ? '#9ca3af' : 'white',
+                  border: '1px solid #e5e7eb',
+                  cursor: !timelineIsPlaying ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => {
+                  if (timelineIsPlaying) {
+                    e.currentTarget.style.backgroundColor = '#333'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (timelineIsPlaying) {
+                    e.currentTarget.style.backgroundColor = '#000'
+                  }
+                }}
+              >
+                <Square style={{width: '1rem', height: '1rem'}} />
+              </button>
+              
+              {/* Unified Timeline Track */}
               <div 
                 onClick={handleTimelineClick}
                 style={{
@@ -270,64 +355,151 @@ export function Review() {
                   transition: 'border-color 0.2s',
                   flex: 1
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#000'}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
               >
-              {/* Timeline Track */}
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '1rem',
-                right: '1rem',
-                height: '4px',
-                backgroundColor: '#d1d5db',
-                borderRadius: '2px',
-                transform: 'translateY(-50%)'
-              }} />
+                {/* Background Timeline Track */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '1rem',
+                  right: '1rem',
+                  height: '4px',
+                  backgroundColor: '#e5e7eb',
+                  borderRadius: '2px',
+                  transform: 'translateY(-50%)'
+                }} />
 
-              {/* Event Markers */}
-              {sortedEvents.map((event) => (
-                <div
-                  key={event.id}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedEvent(event)
-                  }}
-                  style={{
+                {/* Progress Bar Overlay */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '1rem',
+                  width: currentRoute ? `calc((${(timelinePosition / currentRoute.totalDuration) * 100}% * (100% - 2rem)) / 100%)` : '0%',
+                  height: '4px',
+                  backgroundColor: '#000',
+                  borderRadius: '2px',
+                  transform: 'translateY(-50%)',
+                  transition: timelineIsPlaying ? 'none' : 'width 0.2s'
+                }} />
+
+                {/* Current Position Indicator */}
+                {currentRoute && (
+                  <div style={{
                     position: 'absolute',
-                    left: `${Math.max(1, Math.min(95, event.timelinePosition))}%`,
+                    left: `calc(1rem + (${(timelinePosition / currentRoute.totalDuration) * 100}% * (100% - 2rem)) / 100%)`,
                     top: '50%',
                     transform: 'translate(-50%, -50%)',
-                    width: '1rem',
-                    height: '1rem',
+                    width: '16px',
+                    height: '16px',
                     borderRadius: '50%',
+                    backgroundColor: '#000',
                     border: '2px solid white',
-                    backgroundColor: (() => {
-                      switch (event.type) {
-                        case 'RED_SIGNAL': return '#991b1b'
-                        case 'PERSON_IN_TRACK': return '#9a3412'
-                        case 'OBSTACLE': return '#92400e'
-                        case 'SPEED_LIMIT': return '#1e40af'
-                        case 'WARNING': return '#374151'
-                        default: return '#374151'
-                      }
-                    })(),
+                    zIndex: 20,
+                    transition: timelineIsPlaying ? 'none' : 'left 0.2s'
+                  }} />
+                )}
+
+                {/* Event Markers */}
+                {sortedEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedEvent(event)
+                    }}
+                    style={{
+                      position: 'absolute',
+                      left: `${Math.max(1, Math.min(95, event.timelinePosition))}%`,
+                      top: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: selectedEvent.id === event.id ? '18px' : '14px',
+                      height: selectedEvent.id === event.id ? '18px' : '14px',
+                      borderRadius: '50%',
+                      border: '2px solid white',
+                      backgroundColor: (() => {
+                        switch (event.type) {
+                          case 'RED_SIGNAL': return '#dc2626'
+                          case 'PERSON_IN_TRACK': return '#f59e0b'
+                          case 'OBSTACLE': return '#eab308'
+                          case 'SPEED_LIMIT': return '#2563eb'
+                          case 'WARNING': return '#6b7280'
+                          default: return '#6b7280'
+                        }
+                      })(),
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: selectedEvent.id === event.id ? '0 0 0 3px rgba(59, 130, 246, 0.3)' : '0 2px 6px rgba(0, 0, 0, 0.2)',
+                      zIndex: selectedEvent.id === event.id ? 15 : 10
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.3)'
+                      e.currentTarget.style.zIndex = '25'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'
+                      e.currentTarget.style.zIndex = selectedEvent.id === event.id ? '15' : '10'
+                    }}
+                    title={`${event.type.replace('_', ' ')} - ${event.timestamp}`}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {/* Timeline Scrubber Slider */}
+            <div style={{
+              marginTop: '1rem',
+              padding: '0 1rem'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <input
+                  type="range"
+                  min="0"
+                  max={currentRoute?.totalDuration || 100}
+                  value={timelinePosition}
+                  onChange={(e) => {
+                    const newPosition = Number(e.target.value)
+                    setTimelinePosition(newPosition)
+                    
+                    // Find the closest event to the new position for auto-selection
+                    if (currentRoute && sortedEvents.length > 0) {
+                      const positionRatio = newPosition / currentRoute.totalDuration
+                      const closestEvent = sortedEvents.reduce((closest, current) => {
+                        const currentRatio = current.timeRatio || (current.timelinePosition / 100)
+                        const closestRatio = closest.timeRatio || (closest.timelinePosition / 100)
+                        return Math.abs(currentRatio - positionRatio) < Math.abs(closestRatio - positionRatio)
+                          ? current
+                          : closest
+                      })
+                      setSelectedEvent(closestEvent)
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    height: '4px',
+                    borderRadius: '2px',
+                    background: `linear-gradient(to right, #000 0%, #000 ${currentRoute ? (timelinePosition / currentRoute.totalDuration) * 100 : 0}%, #e5e7eb ${currentRoute ? (timelinePosition / currentRoute.totalDuration) * 100 : 0}%, #e5e7eb 100%)`,
+                    outline: 'none',
                     cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: selectedEvent.id === event.id ? '0 0 0 3px rgba(59, 130, 246, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                    zIndex: selectedEvent.id === event.id ? 10 : 5
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    appearance: 'none'
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.2)'
-                    e.currentTarget.style.zIndex = '15'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'
-                    e.currentTarget.style.zIndex = selectedEvent.id === event.id ? '10' : '5'
-                  }}
-                  title={`${event.type.replace('_', ' ')} - ${event.timestamp}`}
+                  className="timeline-slider"
                 />
-              ))}
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: '500',
+                  color: '#6b7280',
+                  minWidth: '80px',
+                  textAlign: 'right'
+                }}>
+                  {currentRoute ? `${((timelinePosition / currentRoute.totalDuration) * 100).toFixed(1)}%` : '0%'}
+                </span>
               </div>
             </div>
           </div>
@@ -588,6 +760,9 @@ export function Review() {
               selectedEvent={selectedEvent} 
               onEventSelect={setSelectedEvent}
               currentEvents={currentEvents}
+              timelinePosition={timelinePosition}
+              videoFile={currentVideoFile}
+              isPlaying={timelineIsPlaying}
             />
             
             {/* Event List Below Map */}
