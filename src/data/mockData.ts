@@ -1,5 +1,5 @@
 import type { GeoPoint, RouteMetrics } from '../utils/routeGeometry'
-import { computeRouteMetrics, alignEventWithRoute } from '../utils/routeGeometry'
+import { computeRouteMetrics } from '../utils/routeGeometry'
 
 export interface Event {
   id: string
@@ -16,6 +16,10 @@ export interface Event {
   }
   // New fields for smooth interpolation
   timeRatio?: number // Position as ratio (0-1) along the route
+  smoothLocation?: {
+    lat: number
+    lng: number
+  }
 }
 
 export interface RouteDefinition {
@@ -398,15 +402,6 @@ function initializeRouteMetrics(): void {
 // Initialize metrics on module load
 initializeRouteMetrics()
 
-/**
- * Calculate time ratio for an event based on its timestamp within a journey
- */
-function calculateTimeRatio(eventTimestamp: string, startTimestamp: string, totalDuration: number): number {
-  const eventTime = new Date(eventTimestamp).getTime()
-  const startTime = new Date(startTimestamp).getTime()
-  const elapsedSeconds = (eventTime - startTime) / 1000
-  return Math.max(0, Math.min(1, elapsedSeconds / totalDuration))
-}
 
 /**
  * Get route definition for a video file

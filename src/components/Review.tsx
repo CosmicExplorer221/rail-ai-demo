@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
-import { Play, Square, RotateCcw, ChevronRight, Calendar, Eye, EyeOff, Pause, PlayCircle, Map as MapIcon } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Play, Square, RotateCcw, ChevronRight, Calendar, Eye, EyeOff, Map as MapIcon } from 'lucide-react'
 import { mockEvents, videoDatasets, mockUploadBatches, getRouteForVideo } from '../data/mockData'
 import { Map } from './Map'
 import { useTicker } from '../hooks/useTicker'

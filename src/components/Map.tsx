@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { type Event, getRouteForVideo, getPositionAtTime } from '../data/mockData'
-import { timeToPosition } from '../utils/routeGeometry'
+import { type Event, getRouteForVideo } from '../data/mockData'
 
 // Fix for default markers not showing in React-Leaflet
 import 'leaflet/dist/leaflet.css'
@@ -27,7 +26,7 @@ const createEventIcon = (color: string, isSelected: boolean = false) => {
 }
 
 // Create waypoint markers
-const createWaypointIcon = (index: number, isStart: boolean = false, isEnd: boolean = false) => {
+const createWaypointIcon = (isStart: boolean = false, isEnd: boolean = false) => {
   const color = isStart ? '#10b981' : isEnd ? '#ef4444' : '#6b7280'
   const symbol = isStart ? '🟢' : isEnd ? '🔴' : '⚪'
   return L.divIcon({
@@ -106,15 +105,11 @@ function getEventMarkerColor(eventType: Event['type']) {
 // Component to handle map events and smooth vehicle movement
 function MapController({ 
   selectedEvent, 
-  currentEvents, 
-  timelinePosition = 0,
   videoFile,
   trainPosition,
   autoFollow = false
 }: { 
   selectedEvent: Event
-  currentEvents: Event[]
-  timelinePosition: number
   videoFile?: string
   trainPosition: [number, number]
   autoFollow?: boolean
@@ -430,7 +425,7 @@ export function Map({
               <Marker
                 key={`waypoint-${index}`}
                 position={waypoint}
-                icon={createWaypointIcon(index, isStart, isEnd)}
+                icon={createWaypointIcon(isStart, isEnd)}
               >
                 <Popup>
                   <div style={{ textAlign: 'center' }}>
@@ -540,9 +535,7 @@ export function Map({
 
           {/* Map controller for handling events */}
           <MapController 
-            selectedEvent={selectedEvent} 
-            currentEvents={currentEvents}
-            timelinePosition={timelinePosition}
+            selectedEvent={selectedEvent}
             videoFile={videoFile}
             trainPosition={trainPosition}
             autoFollow={autoFollow}

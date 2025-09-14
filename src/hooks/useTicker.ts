@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react'
  */
 export function useTicker(isPlaying: boolean, onTick: (deltaTime: number) => void) {
   const lastTimeRef = useRef<number | null>(null)
-  const rafRef = useRef<number>()
+  const rafRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     if (!isPlaying) {
