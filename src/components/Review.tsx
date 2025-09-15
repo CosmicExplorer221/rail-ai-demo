@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Play, Square, RotateCcw, ChevronRight, Calendar, Eye, EyeOff, Map as MapIcon } from 'lucide-react'
-import { mockEvents, videoDatasets, mockUploadBatches, getRouteForVideo } from '../data/mockData'
+import { mockEvents, videoDatasets, mockUploadBatches, getRouteForVideo, type EventData } from '../data/mockData'
 import { Map } from './Map'
 import { useTicker } from '../hooks/useTicker'
 
@@ -72,7 +72,7 @@ export function Review() {
   const [fps, setFps] = useState(30)
   const [currentVideoFile, setCurrentVideoFile] = useState('lineA_km12+400_frontcab.mp4')
   const [currentEvents, setCurrentEvents] = useState(videoDatasets[currentVideoFile] || mockEvents)
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [showVideo, setShowVideo] = useState(false)
   const [showMap, setShowMap] = useState(true)
@@ -442,8 +442,8 @@ export function Review() {
                     return (
                       <div
                         key={`scrubber-event-${event.id}`}
-                        onClick={(e) => {
-                          e.stopPropagation()
+                        onClick={(clickEvent) => {
+                          clickEvent.stopPropagation()
                           setSelectedEvent(event)
                         }}
                         style={{
@@ -470,13 +470,13 @@ export function Review() {
                           boxShadow: selectedEvent?.id === event.id ? '0 0 0 3px rgba(59, 130, 246, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.3)',
                           zIndex: selectedEvent?.id === event.id ? 15 : 10
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.3)'
-                          e.currentTarget.style.zIndex = '25'
+                        onMouseEnter={(mouseEvent) => {
+                          mouseEvent.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.3)'
+                          mouseEvent.currentTarget.style.zIndex = '25'
                         }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'
-                          e.currentTarget.style.zIndex = selectedEvent?.id === event.id ? '15' : '10'
+                        onMouseLeave={(mouseEvent) => {
+                          mouseEvent.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'
+                          mouseEvent.currentTarget.style.zIndex = selectedEvent?.id === event.id ? '15' : '10'
                         }}
                         title={`${event.type.replace('_', ' ')} - ${event.timestamp}`}
                       />

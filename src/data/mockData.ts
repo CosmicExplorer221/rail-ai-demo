@@ -1,7 +1,7 @@
 import type { GeoPoint, RouteMetrics } from '../utils/routeGeometry'
 import { computeRouteMetrics } from '../utils/routeGeometry'
 
-export interface Event {
+export interface EventData {
   id: string
   timestamp: string
   frame: number
@@ -49,7 +49,7 @@ export interface UploadBatch {
 
 // Dataset for lineA_km12+400_frontcab.mp4
 // Berlin to Hamburg Railway Journey (280km) - 20 detection events
-export const lineAEvents: Event[] = [
+export const lineAEvents: EventData[] = [
   { id: 'la1', timestamp: '2024-01-15 08:00:00', frame: 100, type: 'WARNING', confidence: 0.92, note: 'Departure from Berlin Hauptbahnhof', location: { lat: 52.5251, lng: 13.3694, milepost: 'KM 0+000' }, timeRatio: 0.0 },
   { id: 'la2', timestamp: '2024-01-15 08:12:15', frame: 2240, type: 'SPEED_LIMIT', confidence: 0.88, note: 'City speed limit 60 km/h', location: { lat: 52.5800, lng: 13.3200, milepost: 'KM 15+200' }, timeRatio: 0.085 },
   { id: 'la3', timestamp: '2024-01-15 08:25:30', frame: 4680, type: 'PERSON_IN_TRACK', confidence: 0.91, note: 'Track worker at suburban crossing', location: { lat: 52.6500, lng: 13.2400, milepost: 'KM 28+600' }, timeRatio: 0.178 },
@@ -73,7 +73,7 @@ export const lineAEvents: Event[] = [
 ]
 
 // Munich to Berlin High-Speed Railway Journey (580km) - 25 detection events
-export const lineBEvents: Event[] = [
+export const lineBEvents: EventData[] = [
   { id: 'lb1', timestamp: '2024-01-16 06:00:00', frame: 200, type: 'WARNING', confidence: 0.95, note: 'Departure Munich Hauptbahnhof', location: { lat: 48.1400, lng: 11.5600, milepost: 'KM 0+000' } },
   { id: 'lb2', timestamp: '2024-01-16 06:15:30', frame: 2850, type: 'SPEED_LIMIT', confidence: 0.89, note: 'Urban exit speed 160 km/h', location: { lat: 48.2500, lng: 11.6200, milepost: 'KM 22+400' } },
   { id: 'lb3', timestamp: '2024-01-16 06:28:45', frame: 5240, type: 'PERSON_IN_TRACK', confidence: 0.92, note: 'Maintenance crew near Ingolstadt', location: { lat: 48.7600, lng: 11.4200, milepost: 'KM 45+600' } },
@@ -102,7 +102,7 @@ export const lineBEvents: Event[] = [
 ]
 
 // Rotterdam to Warsaw Trans-European Freight Corridor (1150km) - 30 detection events
-export const yardEvents: Event[] = [
+export const yardEvents: EventData[] = [
   { id: 'y1', timestamp: '2025-09-08 04:00:00', frame: 500, type: 'WARNING', confidence: 0.94, note: 'Departure Rotterdam Maasvlakte Port', location: { lat: 51.9500, lng: 4.0200, milepost: 'KM 0+000' } },
   { id: 'y2', timestamp: '2025-09-08 04:18:30', frame: 2850, type: 'OBSTACLE', confidence: 0.89, note: 'Container loading crane overhead', location: { lat: 51.9200, lng: 4.4800, milepost: 'KM 35+200' } },
   { id: 'y3', timestamp: '2025-09-08 04:35:45', frame: 5640, type: 'SPEED_LIMIT', confidence: 0.91, note: 'Urban freight limit 80 km/h', location: { lat: 52.0800, lng: 4.3100, milepost: 'KM 68+400' } },
@@ -136,7 +136,7 @@ export const yardEvents: Event[] = [
 ]
 
 // Dataset for morning_commute_berlin_hauptbahnhof.mp4
-export const morningCommuteEvents: Event[] = [
+export const morningCommuteEvents: EventData[] = [
   {
     id: 'mc1',
     timestamp: '2024-01-20 08:15:30',
@@ -192,7 +192,7 @@ export const morningCommuteEvents: Event[] = [
 ]
 
 // Dataset for night_freight_corridor_east.mp4
-export const nightFreightEvents: Event[] = [
+export const nightFreightEvents: EventData[] = [
   {
     id: 'nf1',
     timestamp: '2024-01-21 23:45:12',
@@ -261,7 +261,7 @@ export const nightFreightEvents: Event[] = [
 ]
 
 // Map video clips to their corresponding events
-export const videoDatasets: Record<string, Event[]> = {
+export const videoDatasets: Record<string, EventData[]> = {
   'lineA_km12+400_frontcab.mp4': lineAEvents,
   'lineB_stationApproach_frontcab.mp4': lineBEvents,
   'yard_2025-09-08_0630.mp4': yardEvents,
@@ -419,8 +419,120 @@ export function getPositionAtTime(videoFile: string, timeRatio: number): GeoPoin
   return route.metrics.pointAtRatio(timeRatio)
 }
 
-// Default events (backward compatibility)
-export const mockEvents: Event[] = lineAEvents
+// Enhanced combined events from all routes for more realistic dashboard
+export const mockEvents = [
+  // Recent events from different routes (last 24 hours)
+  ...lineAEvents.slice(0, 8).map(event => ({
+    ...event,
+    timestamp: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+  })),
+  
+  // Station approach events
+  ...lineBEvents.slice(0, 6).map(event => ({
+    ...event,
+    timestamp: new Date(Date.now() - Math.random() * 12 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+  })),
+  
+  // Yard operations events
+  ...yardEvents.slice(0, 4).map(event => ({
+    ...event,
+    timestamp: new Date(Date.now() - Math.random() * 6 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+  })),
+  
+  // Morning commute events
+  ...morningCommuteEvents.slice(0, 3).map(event => ({
+    ...event,
+    timestamp: new Date(Date.now() - Math.random() * 4 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+  })),
+  
+  // Night freight events
+  ...nightFreightEvents.slice(0, 5).map(event => ({
+    ...event,
+    timestamp: new Date(Date.now() - Math.random() * 8 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+  })),
+  
+  // Additional synthetic events for variety
+  {
+    id: 'syn1',
+    timestamp: new Date(Date.now() - Math.random() * 2 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+    frame: 1200,
+    type: 'RED_SIGNAL',
+    confidence: 0.94,
+    note: 'Emergency stop at Munich Central',
+    location: { lat: 48.1400, lng: 11.5600, milepost: 'MUC-HBF+200' },
+    timeRatio: 0.15
+  },
+  {
+    id: 'syn2',
+    timestamp: new Date(Date.now() - Math.random() * 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+    frame: 2400,
+    type: 'PERSON_IN_TRACK',
+    confidence: 0.89,
+    note: 'Track maintenance crew at Frankfurt Junction',
+    location: { lat: 50.1100, lng: 8.6800, milepost: 'FFM-JCT+450' },
+    timeRatio: 0.32
+  },
+  {
+    id: 'syn3',
+    timestamp: new Date(Date.now() - Math.random() * 1 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+    frame: 3600,
+    type: 'OBSTACLE',
+    confidence: 0.91,
+    note: 'Debris on track near Cologne Bridge',
+    location: { lat: 50.9400, lng: 6.9600, milepost: 'CGN-BR+120' },
+    timeRatio: 0.78
+  },
+  {
+    id: 'syn4',
+    timestamp: new Date(Date.now() - Math.random() * 5 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+    frame: 4800,
+    type: 'SPEED_LIMIT',
+    confidence: 0.87,
+    note: 'Construction zone speed limit 80 km/h',
+    location: { lat: 51.2200, lng: 6.7800, milepost: 'DUS-CON+300' },
+    timeRatio: 0.42
+  },
+  {
+    id: 'syn5',
+    timestamp: new Date(Date.now() - Math.random() * 30 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+    frame: 6000,
+    type: 'WARNING',
+    confidence: 0.83,
+    note: 'Weather alert: Heavy rain affecting visibility',
+    location: { lat: 53.5500, lng: 9.9900, milepost: 'HH-WX+890' },
+    timeRatio: 0.67
+  },
+  {
+    id: 'syn6',
+    timestamp: new Date(Date.now() - Math.random() * 45 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+    frame: 7200,
+    type: 'RED_SIGNAL',
+    confidence: 0.96,
+    note: 'Signal malfunction at Dresden East',
+    location: { lat: 51.0500, lng: 13.7400, milepost: 'DD-E+670' },
+    timeRatio: 0.85
+  },
+  {
+    id: 'syn7',
+    timestamp: new Date(Date.now() - Math.random() * 20 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+    frame: 8400,
+    type: 'PERSON_IN_TRACK',
+    confidence: 0.92,
+    note: 'Emergency responder on track at Stuttgart',
+    location: { lat: 48.7800, lng: 9.1800, milepost: 'STU-ER+240' },
+    timeRatio: 0.21
+  },
+  {
+    id: 'syn8',
+    timestamp: new Date(Date.now() - Math.random() * 90 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '),
+    frame: 9600,
+    type: 'OBSTACLE',
+    confidence: 0.88,
+    note: 'Animal on track near Nuremberg',
+    location: { lat: 49.4500, lng: 11.0800, milepost: 'NUE-AN+150' },
+    timeRatio: 0.56
+  }
+].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) // Sort by newest first
 
 export const mockModels: Model[] = [
   {

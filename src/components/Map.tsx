@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { type Event, getRouteForVideo } from '../data/mockData'
+import { type EventData, getRouteForVideo } from '../data/mockData'
 
 // Fix for default markers not showing in React-Leaflet
 import 'leaflet/dist/leaflet.css'
@@ -82,15 +82,15 @@ const createVehicleIcon = (isMoving = false) => {
 }
 
 interface MapProps {
-  selectedEvent: Event | null
-  onEventSelect: (event: Event) => void
-  currentEvents: Event[]
+  selectedEvent: EventData | null
+  onEventSelect: (event: EventData) => void
+  currentEvents: EventData[]
   timelinePosition?: number // Current timeline position in seconds
   videoFile?: string // Current video file to determine route
   isPlaying?: boolean
 }
 
-function getEventMarkerColor(eventType: Event['type']) {
+function getEventMarkerColor(eventType: EventData['type']) {
   switch (eventType) {
     case 'RED_SIGNAL':
       return '#dc2626'
@@ -114,7 +114,7 @@ function MapController({
   trainPosition,
   autoFollow = false
 }: { 
-  selectedEvent: Event | null
+  selectedEvent: EventData | null
   videoFile?: string
   trainPosition: [number, number]
   autoFollow?: boolean
