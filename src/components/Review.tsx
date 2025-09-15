@@ -72,7 +72,7 @@ export function Review() {
   const [fps, setFps] = useState(30)
   const [currentVideoFile, setCurrentVideoFile] = useState('lineA_km12+400_frontcab.mp4')
   const [currentEvents, setCurrentEvents] = useState(videoDatasets[currentVideoFile] || mockEvents)
-  const [selectedEvent, setSelectedEvent] = useState(currentEvents[0])
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [showVideo, setShowVideo] = useState(false)
   const [showMap, setShowMap] = useState(true)
@@ -80,6 +80,8 @@ export function Review() {
   const [timelinePosition, setTimelinePosition] = useState(0) // Current position in seconds
   const [videoResolution] = useState('1920x1080')
   const [videoFps] = useState('30 fps')
+  const [showTimelineEvents, setShowTimelineEvents] = useState(false) // Toggle for showing events on timeline
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set()) // Active event type filters
   
   // Get route definition for current video
   const currentRoute = useMemo(() => getRouteForVideo(currentVideoFile), [currentVideoFile])
@@ -111,9 +113,28 @@ export function Review() {
       }))
   }, [])
 
+  // Filter events based on active filters
+  const filteredEvents = useMemo(() => {
+    if (activeFilters.size === 0) return currentEvents
+    return currentEvents.filter(event => activeFilters.has(event.type))
+  }, [currentEvents, activeFilters])
+
+  // Handle filter toggle
+  const handleFilterToggle = (filterName: string) => {
+    setActiveFilters(prev => {
+      const newFilters = new Set(prev)
+      if (newFilters.has(filterName)) {
+        newFilters.delete(filterName)
+      } else {
+        newFilters.add(filterName)
+      }
+      return newFilters
+    })
+  }
+
   // Sort events chronologically and calculate timeline positions
   const sortedEvents = useMemo(() => {
-    const sorted = [...currentEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    const sorted = [...filteredEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     
     // Calculate relative positions (0-100) based on time
     if (sorted.length > 1) {
@@ -128,21 +149,8 @@ export function Review() {
     }
     
     return sorted.map(event => ({ ...event, timelinePosition: 50 }))
-  }, [currentEvents])
+  }, [filteredEvents])
 
-  const handleTimelineClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const clickPosition = ((event.clientX - rect.left) / rect.width) * 100
-    
-    // Find closest event to clicked position
-    const closestEvent = sortedEvents.reduce((closest, current) => {
-      return Math.abs(current.timelinePosition - clickPosition) < Math.abs(closest.timelinePosition - clickPosition)
-        ? current
-        : closest
-    })
-    
-    setSelectedEvent(closestEvent)
-  }
 
   const handleClipSelection = (clip: any) => {
     setCurrentVideoFile(clip.name)
@@ -165,8 +173,12 @@ export function Review() {
         <p style={{marginTop: '0.5rem', fontSize: '1.125rem', color: '#4b5563'}}>Analyze detected events and validate AI predictions</p>
       </div>
 
-      {/* Timeline Scrubber */}
-      <div className="card mb-8">
+      {/* Main Layout Grid */}
+      <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem', marginBottom: '2rem'}}>
+        {/* Left Column - Event Timeline */}
+        <div>
+          {/* Timeline Scrubber */}
+          <div className="card">
         <div className="p-6">
           <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
             <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
@@ -228,6 +240,29 @@ export function Review() {
                 <MapIcon style={{width: '1rem', height: '1rem'}} />
                 {showMap ? 'Hide Map' : 'Show Map'}
               </button>
+              
+              <button
+                onClick={() => setShowTimelineEvents(!showTimelineEvents)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #d1d5db',
+                  backgroundColor: showTimelineEvents ? '#eff6ff' : 'transparent',
+                  color: showTimelineEvents ? '#1d4ed8' : '#374151',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = showTimelineEvents ? '#dbeafe' : '#f9fafb'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = showTimelineEvents ? '#eff6ff' : 'transparent'}
+              >
+                {showTimelineEvents ? <EyeOff style={{width: '1rem', height: '1rem'}} /> : <Eye style={{width: '1rem', height: '1rem'}} />}
+                {showTimelineEvents ? 'Hide Events' : 'Show Events'}
+              </button>
             </div>
           </div>
 
@@ -272,181 +307,78 @@ export function Review() {
                 </span>
               </div>
               <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                {/* Play/Stop Buttons */}
+                <button
+                  onClick={() => setTimelineIsPlaying(true)}
+                  disabled={timelineIsPlaying}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    backgroundColor: timelineIsPlaying ? '#f3f4f6' : '#000',
+                    color: timelineIsPlaying ? '#9ca3af' : 'white',
+                    border: '1px solid #e5e7eb',
+                    cursor: timelineIsPlaying ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    fontSize: '0.75rem',
+                    fontWeight: '500'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!timelineIsPlaying) {
+                      e.currentTarget.style.backgroundColor = '#333'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!timelineIsPlaying) {
+                      e.currentTarget.style.backgroundColor = '#000'
+                    }
+                  }}
+                >
+                  <Play style={{width: '0.75rem', height: '0.75rem'}} />
+                  Play
+                </button>
+                
+                <button
+                  onClick={() => setTimelineIsPlaying(false)}
+                  disabled={!timelineIsPlaying}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    backgroundColor: !timelineIsPlaying ? '#f3f4f6' : '#000',
+                    color: !timelineIsPlaying ? '#9ca3af' : 'white',
+                    border: '1px solid #e5e7eb',
+                    cursor: !timelineIsPlaying ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    fontSize: '0.75rem',
+                    fontWeight: '500'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (timelineIsPlaying) {
+                      e.currentTarget.style.backgroundColor = '#333'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (timelineIsPlaying) {
+                      e.currentTarget.style.backgroundColor = '#000'
+                    }
+                  }}
+                >
+                  <Square style={{width: '0.75rem', height: '0.75rem'}} />
+                  Stop
+                </button>
+                
                 <span>{sortedEvents.length} events</span>
                 <span>{sortedEvents.length > 0 ? new Date(sortedEvents[sortedEvents.length - 1].timestamp).toLocaleTimeString('en-US', { hour12: false }) : '23:59'}</span>
               </div>
             </div>
             
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-              {/* Play Button */}
-              <button
-                onClick={() => setTimelineIsPlaying(true)}
-                disabled={timelineIsPlaying}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '0.375rem',
-                  backgroundColor: timelineIsPlaying ? '#f3f4f6' : '#000',
-                  color: timelineIsPlaying ? '#9ca3af' : 'white',
-                  border: '1px solid #e5e7eb',
-                  cursor: timelineIsPlaying ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s',
-                  flexShrink: 0
-                }}
-                onMouseEnter={(e) => {
-                  if (!timelineIsPlaying) {
-                    e.currentTarget.style.backgroundColor = '#333'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!timelineIsPlaying) {
-                    e.currentTarget.style.backgroundColor = '#000'
-                  }
-                }}
-              >
-                <Play style={{width: '1rem', height: '1rem'}} />
-              </button>
-              
-              {/* Stop Button */}
-              <button
-                onClick={() => setTimelineIsPlaying(false)}
-                disabled={!timelineIsPlaying}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '0.375rem',
-                  backgroundColor: !timelineIsPlaying ? '#f3f4f6' : '#000',
-                  color: !timelineIsPlaying ? '#9ca3af' : 'white',
-                  border: '1px solid #e5e7eb',
-                  cursor: !timelineIsPlaying ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s',
-                  flexShrink: 0
-                }}
-                onMouseEnter={(e) => {
-                  if (timelineIsPlaying) {
-                    e.currentTarget.style.backgroundColor = '#333'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (timelineIsPlaying) {
-                    e.currentTarget.style.backgroundColor = '#000'
-                  }
-                }}
-              >
-                <Square style={{width: '1rem', height: '1rem'}} />
-              </button>
-              
-              {/* Unified Timeline Track */}
-              <div 
-                onClick={handleTimelineClick}
-                style={{
-                  position: 'relative',
-                  height: '3rem',
-                  backgroundColor: '#f3f4f6',
-                  borderRadius: '0.75rem',
-                  cursor: 'pointer',
-                  border: '2px solid #e5e7eb',
-                  transition: 'border-color 0.2s',
-                  flex: 1
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#000'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
-              >
-                {/* Background Timeline Track */}
-                <div style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '1rem',
-                  right: '1rem',
-                  height: '4px',
-                  backgroundColor: '#e5e7eb',
-                  borderRadius: '2px',
-                  transform: 'translateY(-50%)'
-                }} />
-
-                {/* Progress Bar Overlay */}
-                <div style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '1rem',
-                  width: currentRoute ? `calc((${(timelinePosition / currentRoute.totalDuration) * 100}% * (100% - 2rem)) / 100%)` : '0%',
-                  height: '4px',
-                  backgroundColor: '#000',
-                  borderRadius: '2px',
-                  transform: 'translateY(-50%)',
-                  transition: timelineIsPlaying ? 'none' : 'width 0.2s'
-                }} />
-
-                {/* Current Position Indicator */}
-                {currentRoute && (
-                  <div style={{
-                    position: 'absolute',
-                    left: `calc(1rem + (${(timelinePosition / currentRoute.totalDuration) * 100}% * (100% - 2rem)) / 100%)`,
-                    top: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '50%',
-                    backgroundColor: '#000',
-                    border: '2px solid white',
-                    zIndex: 20,
-                    transition: timelineIsPlaying ? 'none' : 'left 0.2s'
-                  }} />
-                )}
-
-                {/* Event Markers */}
-                {sortedEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedEvent(event)
-                    }}
-                    style={{
-                      position: 'absolute',
-                      left: `${Math.max(1, Math.min(95, event.timelinePosition))}%`,
-                      top: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      width: selectedEvent.id === event.id ? '18px' : '14px',
-                      height: selectedEvent.id === event.id ? '18px' : '14px',
-                      borderRadius: '50%',
-                      border: '2px solid white',
-                      backgroundColor: (() => {
-                        switch (event.type) {
-                          case 'RED_SIGNAL': return '#dc2626'
-                          case 'PERSON_IN_TRACK': return '#f59e0b'
-                          case 'OBSTACLE': return '#eab308'
-                          case 'SPEED_LIMIT': return '#2563eb'
-                          case 'WARNING': return '#6b7280'
-                          default: return '#6b7280'
-                        }
-                      })(),
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: selectedEvent.id === event.id ? '0 0 0 3px rgba(59, 130, 246, 0.3)' : '0 2px 6px rgba(0, 0, 0, 0.2)',
-                      zIndex: selectedEvent.id === event.id ? 15 : 10
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.3)'
-                      e.currentTarget.style.zIndex = '25'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'
-                      e.currentTarget.style.zIndex = selectedEvent.id === event.id ? '15' : '10'
-                    }}
-                    title={`${event.type.replace('_', ' ')} - ${event.timestamp}`}
-                  />
-                ))}
-              </div>
-            </div>
             
-            {/* Timeline Scrubber Slider */}
+            {/* Timeline Scrubber with Events */}
             <div style={{
               marginTop: '1rem',
               padding: '0 1rem'
@@ -456,41 +388,102 @@ export function Review() {
                 alignItems: 'center',
                 gap: '1rem'
               }}>
-                <input
-                  type="range"
-                  min="0"
-                  max={currentRoute?.totalDuration || 100}
-                  value={timelinePosition}
-                  onChange={(e) => {
-                    const newPosition = Number(e.target.value)
-                    setTimelinePosition(newPosition)
+                {/* Timeline container with events */}
+                <div style={{
+                  position: 'relative',
+                  flex: 1,
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                  <input
+                    type="range"
+                    min="0"
+                    max={currentRoute?.totalDuration || 100}
+                    value={timelinePosition}
+                    onChange={(e) => {
+                      const newPosition = Number(e.target.value)
+                      setTimelinePosition(newPosition)
+                      
+                      // Find the closest event to the new position for auto-selection
+                      if (currentRoute && sortedEvents.length > 0) {
+                        const positionRatio = newPosition / currentRoute.totalDuration
+                        const closestEvent = sortedEvents.reduce((closest, current) => {
+                          const currentRatio = current.timeRatio || (current.timelinePosition / 100)
+                          const closestRatio = closest.timeRatio || (closest.timelinePosition / 100)
+                          return Math.abs(currentRatio - positionRatio) < Math.abs(closestRatio - positionRatio)
+                            ? current
+                            : closest
+                        })
+                        setSelectedEvent(closestEvent)
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '4px',
+                      borderRadius: '2px',
+                      background: `linear-gradient(to right, #000 0%, #000 ${currentRoute ? (timelinePosition / currentRoute.totalDuration) * 100 : 0}%, #e5e7eb ${currentRoute ? (timelinePosition / currentRoute.totalDuration) * 100 : 0}%, #e5e7eb 100%)`,
+                      outline: 'none',
+                      cursor: 'pointer',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none',
+                      appearance: 'none'
+                    }}
+                    className="timeline-slider"
+                  />
+                  
+                  {/* Event Markers on Scrubber - only show when toggle is enabled */}
+                  {showTimelineEvents && sortedEvents.map((event) => {
+                    const timeRatio = currentRoute ? 
+                      (event.timeRatio !== undefined ? event.timeRatio : event.timelinePosition / 100) : 
+                      event.timelinePosition / 100
+                    const leftPosition = timeRatio * 100
                     
-                    // Find the closest event to the new position for auto-selection
-                    if (currentRoute && sortedEvents.length > 0) {
-                      const positionRatio = newPosition / currentRoute.totalDuration
-                      const closestEvent = sortedEvents.reduce((closest, current) => {
-                        const currentRatio = current.timeRatio || (current.timelinePosition / 100)
-                        const closestRatio = closest.timeRatio || (closest.timelinePosition / 100)
-                        return Math.abs(currentRatio - positionRatio) < Math.abs(closestRatio - positionRatio)
-                          ? current
-                          : closest
-                      })
-                      setSelectedEvent(closestEvent)
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    height: '4px',
-                    borderRadius: '2px',
-                    background: `linear-gradient(to right, #000 0%, #000 ${currentRoute ? (timelinePosition / currentRoute.totalDuration) * 100 : 0}%, #e5e7eb ${currentRoute ? (timelinePosition / currentRoute.totalDuration) * 100 : 0}%, #e5e7eb 100%)`,
-                    outline: 'none',
-                    cursor: 'pointer',
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none',
-                    appearance: 'none'
-                  }}
-                  className="timeline-slider"
-                />
+                    return (
+                      <div
+                        key={`scrubber-event-${event.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedEvent(event)
+                        }}
+                        style={{
+                          position: 'absolute',
+                          left: `${Math.max(1, Math.min(99, leftPosition))}%`,
+                          top: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          width: selectedEvent?.id === event.id ? '16px' : '12px',
+                          height: selectedEvent?.id === event.id ? '16px' : '12px',
+                          borderRadius: '50%',
+                          border: '2px solid white',
+                          backgroundColor: (() => {
+                            switch (event.type) {
+                              case 'RED_SIGNAL': return '#dc2626'
+                              case 'PERSON_IN_TRACK': return '#f59e0b'
+                              case 'OBSTACLE': return '#eab308'
+                              case 'SPEED_LIMIT': return '#2563eb'
+                              case 'WARNING': return '#6b7280'
+                              default: return '#6b7280'
+                            }
+                          })(),
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: selectedEvent?.id === event.id ? '0 0 0 3px rgba(59, 130, 246, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.3)',
+                          zIndex: selectedEvent?.id === event.id ? 15 : 10
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.3)'
+                          e.currentTarget.style.zIndex = '25'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'
+                          e.currentTarget.style.zIndex = selectedEvent?.id === event.id ? '15' : '10'
+                        }}
+                        title={`${event.type.replace('_', ' ')} - ${event.timestamp}`}
+                      />
+                    )
+                  })}
+                </div>
+                
                 <span style={{
                   fontSize: '0.75rem',
                   fontWeight: '500',
@@ -504,48 +497,262 @@ export function Review() {
             </div>
           </div>
 
-          {/* Selected Event Info */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '1rem',
-            backgroundColor: '#f9fafb',
-            borderRadius: '0.5rem',
-            border: '1px solid #e5e7eb'
-          }}>
-            <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-              <EventTypeChip type={selectedEvent.type} />
-              <span style={{fontSize: '0.875rem', fontWeight: '600', color: '#111827'}}>
-                Event #{selectedEvent.id}
-              </span>
-              <span style={{fontSize: '0.875rem', color: '#6b7280'}}>
-                {selectedEvent.timestamp}
+          {/* Selected Event Info - only show when event is selected */}
+          {selectedEvent && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1rem',
+              backgroundColor: '#f9fafb',
+              borderRadius: '0.5rem',
+              border: '1px solid #e5e7eb'
+            }}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                <EventTypeChip type={selectedEvent.type} />
+                <span style={{fontSize: '0.875rem', fontWeight: '600', color: '#111827'}}>
+                  Event #{selectedEvent.id}
+                </span>
+                <span style={{fontSize: '0.875rem', color: '#6b7280'}}>
+                  {selectedEvent.timestamp}
+                </span>
+              </div>
+              <span style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                backgroundColor: '#eff6ff',
+                color: '#1d4ed8',
+                padding: '0.25rem 0.75rem',
+                borderRadius: '9999px',
+                border: '1px solid #bfdbfe'
+              }}>
+                {(selectedEvent.confidence * 100).toFixed(0)}% confidence
               </span>
             </div>
-            <span style={{
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              backgroundColor: '#eff6ff',
-              color: '#1d4ed8',
-              padding: '0.25rem 0.75rem',
-              borderRadius: '9999px',
-              border: '1px solid #bfdbfe'
-            }}>
-              {(selectedEvent.confidence * 100).toFixed(0)}% confidence
-            </span>
+          )}
+          </div>
+        </div>
+
+        {/* Right Column - Filters and Video Uploads */}
+        <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+          {/* Filters Section */}
+          <div className="card">
+            <div className="p-6">
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
+                <h4 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>Filters</h4>
+                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                  <span style={{fontSize: '0.875rem', color: '#6b7280'}}>
+                    {activeFilters.size > 0 ? `${activeFilters.size} active` : 'No filters'}
+                  </span>
+                  {activeFilters.size > 0 && (
+                    <button
+                      onClick={() => setActiveFilters(new Set())}
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        color: '#dc2626',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem'}}>
+                {[
+                  { name: 'PERSON_IN_TRACK', displayName: 'person track', color: '#ea580c' },
+                  { name: 'OBSTACLE', displayName: 'track obstruction', color: '#d97706' },
+                  { name: 'SIGNAL_GREEN', displayName: 'signal aspect green', color: '#16a34a' },
+                  { name: 'SIGNAL_YELLOW', displayName: 'signal aspect yellow', color: '#d97706' },
+                  { name: 'RED_SIGNAL', displayName: 'signal aspect red', color: '#dc2626' },
+                  { name: 'BALISE', displayName: 'balise box', color: '#8b5cf6' },
+                  { name: 'SPEED_LIMIT', displayName: 'speed board', color: '#2563eb' },
+                  { name: 'SWITCH', displayName: 'switch', color: '#0891b2' },
+                  { name: 'WARNING', displayName: 'crossing', color: '#6b7280' }
+                ].map((filter) => {
+                  const isActive = activeFilters.has(filter.name)
+                  return (
+                    <button
+                      key={filter.name}
+                      onClick={() => handleFilterToggle(filter.name)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.75rem 1rem',
+                        fontSize: '0.875rem',
+                        color: isActive ? '#111827' : '#374151',
+                        backgroundColor: isActive ? '#eff6ff' : '#f9fafb',
+                        border: '2px solid',
+                        borderColor: isActive ? '#3b82f6' : '#e5e7eb',
+                        borderRadius: '0.375rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        textAlign: 'left',
+                        fontWeight: isActive ? '500' : '400'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = '#f3f4f6'
+                          e.currentTarget.style.borderColor = '#d1d5db'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = '#f9fafb'
+                          e.currentTarget.style.borderColor = '#e5e7eb'
+                        }
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '0.75rem',
+                          height: '0.75rem',
+                          borderRadius: '50%',
+                          backgroundColor: filter.color,
+                          flexShrink: 0,
+                          opacity: isActive ? 1 : 0.6
+                        }}
+                      />
+                      {filter.displayName}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Video Uploads Panel */}
+          <div className="card" style={{flex: 1}}>
+            <div className="p-6">
+              <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>Video Uploads</h3>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '500px', overflowY: 'auto'}}>
+                {videoClips.map((clip) => (
+                  <button
+                    key={clip.id}
+                    onClick={() => handleClipSelection(clip)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      border: '2px solid',
+                      borderColor: clip.name === currentVideoFile ? '#10b981' : '#e5e7eb',
+                      backgroundColor: clip.name === currentVideoFile ? '#f0fdf4' : 'transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: clip.name === currentVideoFile ? '0 1px 3px 0 rgb(0 0 0 / 0.1)' : 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (clip.name !== currentVideoFile) {
+                        e.currentTarget.style.backgroundColor = '#f9fafb'
+                        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgb(0 0 0 / 0.05)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (clip.name !== currentVideoFile) {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }
+                    }}
+                  >
+                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem'}}>
+                      <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                        <span style={{fontSize: '0.875rem', color: '#6b7280'}}>📹</span>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          color: 'white',
+                          backgroundColor: (() => {
+                            switch(clip.status) {
+                              case 'completed': return '#10b981'
+                              case 'processing': return '#f59e0b'
+                              case 'failed': return '#dc2626'
+                              default: return '#6b7280'
+                            }
+                          })(),
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.25rem',
+                          textTransform: 'capitalize'
+                        }}>
+                          {clip.status}
+                        </span>
+                      </div>
+                      <ChevronRight style={{
+                        width: '1rem',
+                        height: '1rem',
+                        color: clip.name === currentVideoFile ? '#10b981' : '#9ca3af',
+                        transition: 'color 0.2s'
+                      }} />
+                    </div>
+                    
+                    <p style={{
+                      fontSize: '0.875rem', 
+                      color: '#111827', 
+                      marginBottom: '0.5rem', 
+                      fontWeight: '500',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {clip.name}
+                    </p>
+                    
+                    <div style={{display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#6b7280'}}>
+                      <span>{clip.duration}</span>
+                      <span>{clip.resolution}</span>
+                      <span>{clip.fps}</span>
+                      <span>{clip.size}</span>
+                    </div>
+                    <div style={{fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem'}}>
+                      Uploaded: {new Date(clip.uploadDate).toLocaleDateString()}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Heads up info */}
+              <div style={{
+                marginTop: '1.5rem',
+                padding: '1rem',
+                backgroundColor: '#f8fafc',
+                borderRadius: '0.5rem',
+                border: '1px solid #e2e8f0'
+              }}>
+                <div style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem'}}>
+                  <span style={{
+                    fontSize: '1.25rem',
+                    color: '#3b82f6',
+                    marginTop: '0.125rem'
+                  }}>ℹ️</span>
+                  <div>
+                    <h4 style={{fontSize: '0.875rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem'}}>
+                      Video Uploads ({videoClips.length} files)
+                    </h4>
+                    <p style={{fontSize: '0.875rem', color: '#4b5563', lineHeight: '1.4'}}>
+                      Select any completed video upload to view its detected events on the timeline and map. 
+                      Only .mp4 files from the uploads section are shown.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Video and Map Section */}
       <div style={{
         display: 'grid', 
         gridTemplateColumns: (() => {
           const columns = []
           if (showVideo) columns.push('3fr')
           if (showMap) columns.push('2fr')  
-          columns.push('1fr') // Only Clips column
-          return columns.join(' ')
+          return columns.join(' ') || '1fr'
         })(),
         gap: '2rem'
       }}>
@@ -555,23 +762,31 @@ export function Review() {
           <div className="card">
             <div className="p-6">
               <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Event: {selectedEvent.id} - Frame {selectedEvent.frame}
-                </h3>
-                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                  <EventTypeChip type={selectedEvent.type} />
-                  <span style={{
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    backgroundColor: '#eff6ff',
-                    color: '#1d4ed8',
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '9999px',
-                    border: '1px solid #bfdbfe'
-                  }}>
-                    {(selectedEvent.confidence * 100).toFixed(0)}% confidence
-                  </span>
-                </div>
+                {selectedEvent ? (
+                  <>
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      Event: {selectedEvent.id} - Frame {selectedEvent.frame}
+                    </h3>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                      <EventTypeChip type={selectedEvent.type} />
+                      <span style={{
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        backgroundColor: '#eff6ff',
+                        color: '#1d4ed8',
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '9999px',
+                        border: '1px solid #bfdbfe'
+                      }}>
+                        {(selectedEvent.confidence * 100).toFixed(0)}% confidence
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    No Event Selected
+                  </h3>
+                )}
               </div>
 
               {/* Video Placeholder */}
@@ -588,7 +803,9 @@ export function Review() {
                 <div style={{textAlign: 'center'}}>
                   <Play style={{width: '5rem', height: '5rem', color: '#9ca3af', margin: '0 auto 0.75rem'}} />
                   <p style={{fontSize: '1.125rem', color: '#9ca3af', fontWeight: '500'}}>Event Video Playback</p>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem'}}>Frame {selectedEvent.frame} • {selectedEvent.timestamp}</p>
+                  {selectedEvent && (
+                    <p style={{fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem'}}>Frame {selectedEvent.frame} • {selectedEvent.timestamp}</p>
+                  )}
                 </div>
                 
                 {/* ROI Overlay Chips */}
@@ -733,20 +950,26 @@ export function Review() {
                 padding: '1.5rem'
               }}>
                 <h4 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827', marginBottom: '1rem'}}>Event Details</h4>
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem'}}>
-                  <div style={{backgroundColor: 'white', borderRadius: '0.5rem', padding: '1rem'}}>
-                    <dt style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.25rem'}}>Timestamp</dt>
-                    <dd style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>{selectedEvent.timestamp}</dd>
+                {selectedEvent ? (
+                  <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem'}}>
+                    <div style={{backgroundColor: 'white', borderRadius: '0.5rem', padding: '1rem'}}>
+                      <dt style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.25rem'}}>Timestamp</dt>
+                      <dd style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>{selectedEvent.timestamp}</dd>
+                    </div>
+                    <div style={{backgroundColor: 'white', borderRadius: '0.5rem', padding: '1rem'}}>
+                      <dt style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.25rem'}}>Confidence</dt>
+                      <dd style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>{(selectedEvent.confidence * 100).toFixed(1)}%</dd>
+                    </div>
+                    <div style={{gridColumn: 'span 2', backgroundColor: 'white', borderRadius: '0.5rem', padding: '1rem'}}>
+                      <dt style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.25rem'}}>Description</dt>
+                      <dd style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>{selectedEvent.note}</dd>
+                    </div>
                   </div>
-                  <div style={{backgroundColor: 'white', borderRadius: '0.5rem', padding: '1rem'}}>
-                    <dt style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.25rem'}}>Confidence</dt>
-                    <dd style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>{(selectedEvent.confidence * 100).toFixed(1)}%</dd>
-                  </div>
-                  <div style={{gridColumn: 'span 2', backgroundColor: 'white', borderRadius: '0.5rem', padding: '1rem'}}>
-                    <dt style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.25rem'}}>Description</dt>
-                    <dd style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>{selectedEvent.note}</dd>
-                  </div>
-                </div>
+                ) : (
+                  <p style={{fontSize: '1rem', color: '#6b7280', fontStyle: 'italic'}}>
+                    Select an event to view details
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -759,7 +982,7 @@ export function Review() {
             <Map 
               selectedEvent={selectedEvent} 
               onEventSelect={setSelectedEvent}
-              currentEvents={currentEvents}
+              currentEvents={filteredEvents}
               timelinePosition={timelinePosition}
               videoFile={currentVideoFile}
               isPlaying={timelineIsPlaying}
@@ -780,20 +1003,20 @@ export function Review() {
                         padding: '0.5rem 0.75rem',
                         borderRadius: '0.375rem',
                         border: '1px solid',
-                        borderColor: selectedEvent.id === event.id ? '#bfdbfe' : 'transparent',
-                        backgroundColor: selectedEvent.id === event.id ? '#eff6ff' : 'transparent',
+                        borderColor: selectedEvent?.id === event.id ? '#bfdbfe' : 'transparent',
+                        backgroundColor: selectedEvent?.id === event.id ? '#eff6ff' : 'transparent',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         fontSize: '0.875rem',
                         fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace'
                       }}
                       onMouseEnter={(e) => {
-                        if (selectedEvent.id !== event.id) {
+                        if (selectedEvent?.id !== event.id) {
                           e.currentTarget.style.backgroundColor = '#f9fafb'
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (selectedEvent.id !== event.id) {
+                        if (selectedEvent?.id !== event.id) {
                           e.currentTarget.style.backgroundColor = 'transparent'
                         }
                       }}
@@ -811,7 +1034,7 @@ export function Review() {
                           fontSize: '0.75rem',
                           fontWeight: '500',
                           color: '#4b5563',
-                          backgroundColor: selectedEvent.id === event.id ? '#dbeafe' : '#f3f4f6',
+                          backgroundColor: selectedEvent?.id === event.id ? '#dbeafe' : '#f3f4f6',
                           padding: '0.125rem 0.375rem',
                           borderRadius: '0.25rem',
                           minWidth: '2.5rem',
@@ -844,123 +1067,8 @@ export function Review() {
             </div>
           </div>
         )}
+      </div>
 
-        {/* Recent Clips Panel */}
-        <div className="card">
-          <div className="p-6">
-            <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>Video Uploads</h3>
-            <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '700px', overflowY: 'auto'}}>
-              {videoClips.map((clip) => (
-                <button
-                  key={clip.id}
-                  onClick={() => handleClipSelection(clip)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '1rem',
-                    borderRadius: '0.75rem',
-                    border: '2px solid',
-                    borderColor: clip.name === currentVideoFile ? '#10b981' : '#e5e7eb',
-                    backgroundColor: clip.name === currentVideoFile ? '#f0fdf4' : 'transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: clip.name === currentVideoFile ? '0 1px 3px 0 rgb(0 0 0 / 0.1)' : 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (clip.name !== currentVideoFile) {
-                      e.currentTarget.style.backgroundColor = '#f9fafb'
-                      e.currentTarget.style.boxShadow = '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (clip.name !== currentVideoFile) {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                      e.currentTarget.style.boxShadow = 'none'
-                    }
-                  }}
-                >
-                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem'}}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                      <span style={{fontSize: '0.875rem', color: '#6b7280'}}>📹</span>
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        color: 'white',
-                        backgroundColor: (() => {
-                          switch(clip.status) {
-                            case 'completed': return '#10b981'
-                            case 'processing': return '#f59e0b'
-                            case 'failed': return '#dc2626'
-                            default: return '#6b7280'
-                          }
-                        })(),
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.25rem',
-                        textTransform: 'capitalize'
-                      }}>
-                        {clip.status}
-                      </span>
-                    </div>
-                    <ChevronRight style={{
-                      width: '1rem',
-                      height: '1rem',
-                      color: clip.name === currentVideoFile ? '#10b981' : '#9ca3af',
-                      transition: 'color 0.2s'
-                    }} />
-                  </div>
-                  
-                  <p style={{
-                    fontSize: '0.875rem', 
-                    color: '#111827', 
-                    marginBottom: '0.5rem', 
-                    fontWeight: '500',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {clip.name}
-                  </p>
-                  
-                  <div style={{display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#6b7280'}}>
-                    <span>{clip.duration}</span>
-                    <span>{clip.resolution}</span>
-                    <span>{clip.fps}</span>
-                    <span>{clip.size}</span>
-                  </div>
-                  <div style={{fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem'}}>
-                    Uploaded: {new Date(clip.uploadDate).toLocaleDateString()}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Heads up info */}
-            <div style={{
-              marginTop: '1.5rem',
-              padding: '1rem',
-              backgroundColor: '#f8fafc',
-              borderRadius: '0.5rem',
-              border: '1px solid #e2e8f0'
-            }}>
-              <div style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem'}}>
-                <span style={{
-                  fontSize: '1.25rem',
-                  color: '#3b82f6',
-                  marginTop: '0.125rem'
-                }}>ℹ️</span>
-                <div>
-                  <h4 style={{fontSize: '0.875rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem'}}>
-                    Video Uploads ({videoClips.length} files)
-                  </h4>
-                  <p style={{fontSize: '0.875rem', color: '#4b5563', lineHeight: '1.4'}}>
-                    Select any completed video upload to view its detected events on the timeline and map. 
-                    Only .mp4 files from the uploads section are shown.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
     </div>

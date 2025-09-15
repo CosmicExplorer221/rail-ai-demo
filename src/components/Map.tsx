@@ -27,57 +27,62 @@ const createEventIcon = (color: string, isSelected: boolean = false) => {
 
 // Create waypoint markers
 const createWaypointIcon = (isStart: boolean = false, isEnd: boolean = false) => {
-  const color = isStart ? '#10b981' : isEnd ? '#ef4444' : '#6b7280'
-  const symbol = isStart ? '🟢' : isEnd ? '🔴' : '⚪'
+  const color = isStart ? '#10b981' : isEnd ? '#ef4444' : '#ffffff'
+  const borderColor = isStart ? '#059669' : isEnd ? '#dc2626' : '#6b7280'
+  const symbol = isStart ? 'S' : isEnd ? 'E' : '•'
   return L.divIcon({
     html: `<div style="
       background-color: ${color};
-      width: 20px;
-      height: 20px;
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
-      border: 2px solid white;
+      border: 2px solid ${borderColor};
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: bold;
+      color: ${isStart || isEnd ? 'white' : '#374151'};
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    ">${symbol}</div>`,
+    className: 'waypoint-icon',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+  })
+}
+
+const createVehicleIcon = (isMoving = false) => {
+  return L.divIcon({
+    html: `<div style="
+      background-color: #3b82f6;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 3px solid white;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 12px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-    ">${symbol}</div>`,
-    className: 'waypoint-icon',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
-  })
-}
-
-const createTrainIcon = (isMoving = false) => {
-  return L.divIcon({
-    html: `<div style="
-      background-color: #3b82f6;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      border: 4px solid white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+      font-weight: bold;
+      color: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
       ${isMoving ? 'transition: transform 0.5s ease-in-out;' : ''}
       animation: ${isMoving ? 'pulse 2s infinite' : 'none'};
-    ">🚂</div>
+    ">●</div>
     <style>
       @keyframes pulse {
         0%, 100% { transform: scale(1); }
         50% { transform: scale(1.1); }
       }
     </style>`,
-    className: 'train-icon',
-    iconSize: [40, 40],
-    iconAnchor: [20, 20]
+    className: 'vehicle-icon',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
   })
 }
 
 interface MapProps {
-  selectedEvent: Event
+  selectedEvent: Event | null
   onEventSelect: (event: Event) => void
   currentEvents: Event[]
   timelinePosition?: number // Current timeline position in seconds
@@ -109,7 +114,7 @@ function MapController({
   trainPosition,
   autoFollow = false
 }: { 
-  selectedEvent: Event
+  selectedEvent: Event | null
   videoFile?: string
   trainPosition: [number, number]
   autoFollow?: boolean
@@ -259,35 +264,36 @@ export function Map({
       {/* Map Controls */}
       <div style={{
         position: 'absolute',
-        top: '16px',
-        right: '16px',
+        top: '12px',
+        right: '12px',
         zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px'
+        gap: '6px'
       }}>
         <div style={{
           backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '12px',
+          borderRadius: '6px',
+          padding: '8px',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px'
+          gap: '8px',
+          fontSize: '0.875rem'
         }}>
           {/* Map Provider Toggle */}
-          <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-            <label style={{fontSize: '0.875rem', fontWeight: '500', color: '#374151'}}>
+          <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+            <label style={{fontSize: '0.75rem', fontWeight: '500', color: '#374151'}}>
               Map:
             </label>
             <select 
               value={mapProvider} 
               onChange={(e) => setMapProvider(e.target.value as 'osm' | 'google')}
               style={{
-                padding: '4px 8px',
-                borderRadius: '4px',
+                padding: '2px 6px',
+                borderRadius: '3px',
                 border: '1px solid #d1d5db',
-                fontSize: '0.875rem'
+                fontSize: '0.75rem'
               }}
             >
               <option value="osm">OpenStreetMap</option>
@@ -296,15 +302,15 @@ export function Map({
           </div>
 
           {mapProvider === 'google' && (
-            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
               <select 
                 value={googleMapType} 
                 onChange={(e) => setGoogleMapType(e.target.value as 'roadmap' | 'satellite')}
                 style={{
-                  padding: '4px 8px',
-                  borderRadius: '4px',
+                  padding: '2px 6px',
+                  borderRadius: '3px',
                   border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
+                  fontSize: '0.75rem'
                 }}
               >
                 <option value="roadmap">Road</option>
@@ -318,12 +324,12 @@ export function Map({
             <button
               onClick={() => setShowRailwayOverlay(!showRailwayOverlay)}
               style={{
-                padding: '6px 12px',
-                borderRadius: '4px',
+                padding: '4px 8px',
+                borderRadius: '3px',
                 border: 'none',
                 backgroundColor: showRailwayOverlay ? '#3b82f6' : '#f3f4f6',
                 color: showRailwayOverlay ? 'white' : '#6b7280',
-                fontSize: '0.875rem',
+                fontSize: '0.75rem',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
               }}
@@ -338,28 +344,28 @@ export function Map({
           <button
             onClick={() => setAutoFollow(!autoFollow)}
             style={{
-              padding: '6px 12px',
-              borderRadius: '4px',
+              padding: '4px 8px',
+              borderRadius: '3px',
               border: 'none',
               backgroundColor: autoFollow ? '#10b981' : '#f3f4f6',
               color: autoFollow ? 'white' : '#6b7280',
-              fontSize: '0.875rem',
+              fontSize: '0.75rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = autoFollow ? '#059669' : '#e5e7eb'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = autoFollow ? '#10b981' : '#f3f4f6'}
-            title={autoFollow ? 'Disable auto-follow train' : 'Enable auto-follow train'}
+            title={autoFollow ? 'Disable auto-follow vehicle' : 'Enable auto-follow vehicle'}
           >
-            🚂 {autoFollow ? 'Following' : 'Static'}
+📍 {autoFollow ? 'Following' : 'Static'}
           </button>
 
           <span style={{
-            fontSize: '0.75rem',
+            fontSize: '0.625rem',
             color: '#6b7280',
             backgroundColor: '#f3f4f6',
-            padding: '4px 8px',
-            borderRadius: '12px'
+            padding: '2px 6px',
+            borderRadius: '8px'
           }}>
             {routeDefinition?.name || 'Unknown Route'} • {autoFollow && isPlaying ? 'Following' : 'Fixed View'}
           </span>
@@ -435,7 +441,7 @@ export function Map({
                       marginBottom: '4px',
                       color: isStart ? '#10b981' : isEnd ? '#ef4444' : '#6b7280'
                     }}>
-                      {isStart ? '🟢 Start' : isEnd ? '🔴 End' : `⚪ Waypoint ${index + 1}`}
+                      {isStart ? '🚩 Route Start' : isEnd ? '🏁 Route End' : `📍 Waypoint ${index + 1}`}
                     </div>
                     <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
                       <div>Lat: {waypoint[0].toFixed(4)}</div>
@@ -503,11 +509,11 @@ export function Map({
             )
           })}
 
-          {/* Train position marker */}
+          {/* Vehicle position marker */}
           {trainPosition && (
             <Marker
               position={trainPosition}
-              icon={createTrainIcon(isPlaying)}
+              icon={createVehicleIcon(isPlaying)}
               zIndexOffset={1000}
             >
               <Popup>
@@ -518,7 +524,7 @@ export function Map({
                     marginBottom: '8px',
                     color: '#3b82f6'
                   }}>
-                    🚂 Current Position
+                    📍 Current Position
                   </div>
                   <div style={{fontSize: '0.85rem', color: '#374151'}}>
                     <div>Timeline: {Math.round(timelinePosition)}s</div>
@@ -533,6 +539,7 @@ export function Map({
             </Marker>
           )}
 
+          {/* Map controller for handling events */}
           {/* Map controller for handling events */}
           <MapController 
             selectedEvent={selectedEvent}
@@ -579,7 +586,7 @@ export function Map({
             <span style={{color: '#6b7280'}}>Warning</span>
           </div>
           <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
-            <span style={{fontSize: '12px'}}>🚂</span>
+            <div style={{width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3b82f6'}}></div>
             <span style={{color: '#6b7280'}}>Current Position</span>
           </div>
         </div>
