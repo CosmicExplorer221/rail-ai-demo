@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Upload, File, CheckCircle, AlertCircle, Clock, Plus } from 'lucide-react'
+import { Upload, File, CheckCircle, AlertCircle, Clock, Plus, Play, Monitor } from 'lucide-react'
 import { mockUploadBatches, type UploadBatch } from '../data/mockData'
 
 function StatusChip({ status }: { status: UploadBatch['status'] }) {
@@ -84,6 +84,7 @@ function TypeChip({ type }: { type: UploadBatch['type'] }) {
 export function Uploads() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [dragActive, setDragActive] = useState(false)
+  const [selectedDataset, setSelectedDataset] = useState('lineA_km12+400_frontcab.mp4')
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -121,8 +122,124 @@ export function Uploads() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Data Uploads</h1>
-        <p style={{marginTop: '0.5rem', fontSize: '1.125rem', color: '#4b5563'}}>Upload video footage, annotations, and sensor data</p>
+        <h1 className="text-3xl font-bold text-gray-900">Datasets</h1>
+        <p style={{marginTop: '0.5rem', fontSize: '1.125rem', color: '#4b5563'}}>Manage video datasets and select for analysis</p>
+      </div>
+
+      {/* Dataset Selection */}
+      <div className="card" style={{marginBottom: '2rem'}}>
+        <div className="p-6">
+          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
+            <h3 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>Active Dataset Selection</h3>
+            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+              <Monitor style={{width: '1rem', height: '1rem', color: '#2563eb'}} />
+              <span style={{fontSize: '0.875rem', color: '#2563eb', fontWeight: '500'}}>Used for Analysis</span>
+            </div>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '1rem'
+          }}>
+            {mockUploadBatches
+              .filter(batch => batch.type === 'MP4' && batch.status === 'COMPLETED')
+              .map((batch) => {
+                const isSelected = selectedDataset === batch.name
+                return (
+                  <div
+                    key={batch.id}
+                    onClick={() => setSelectedDataset(batch.name)}
+                    style={{
+                      border: '2px solid',
+                      borderColor: isSelected ? '#2563eb' : '#e5e7eb',
+                      borderRadius: '0.5rem',
+                      padding: '1rem',
+                      transition: 'all 0.2s',
+                      cursor: 'pointer',
+                      backgroundColor: isSelected ? '#eff6ff' : 'transparent'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = '#9ca3af'
+                        e.currentTarget.style.backgroundColor = '#f9fafb'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = '#e5e7eb'
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }
+                    }}
+                  >
+                    <div style={{display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem'}}>
+                      <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                        <div style={{
+                          padding: '0.5rem',
+                          borderRadius: '0.375rem',
+                          backgroundColor: isSelected ? '#dbeafe' : '#f3f4f6'
+                        }}>
+                          <Play style={{width: '1.25rem', height: '1.25rem', color: isSelected ? '#2563eb' : '#6b7280'}} />
+                        </div>
+                        <div style={{minWidth: 0, flex: 1}}>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            color: isSelected ? '#1e40af' : '#111827',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {batch.name}
+                          </p>
+                          <p style={{fontSize: '0.75rem', color: '#6b7280'}}>{batch.size}</p>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <div style={{
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '9999px',
+                          backgroundColor: '#2563eb',
+                          color: 'white',
+                          fontSize: '0.75rem',
+                          fontWeight: '500'
+                        }}>
+                          ACTIVE
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem'}}>
+                      <TypeChip type={batch.type} />
+                      <StatusChip status={batch.status} />
+                    </div>
+
+                    <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
+                      <p>Uploaded: {batch.uploadDate}</p>
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+
+          {selectedDataset && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.75rem',
+              backgroundColor: '#f0fdf4',
+              borderRadius: '0.375rem',
+              border: '1px solid #bbf7d0'
+            }}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                <CheckCircle style={{width: '1rem', height: '1rem', color: '#16a34a'}} />
+                <span style={{fontSize: '0.875rem', fontWeight: '500', color: '#166534'}}>
+                  Dataset "{selectedDataset}" is now active for analysis in the Review tab
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Upload Section */}

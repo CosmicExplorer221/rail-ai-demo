@@ -10,7 +10,7 @@ import {
 const navigation = [
   { name: 'Dashboard', icon: LayoutDashboard, id: 'dashboard' },
   { name: 'Review', icon: Eye, id: 'review' },
-  { name: 'Uploads', icon: Upload, id: 'uploads' },
+  { name: 'Datasets', icon: Upload, id: 'uploads' },
   { name: 'Models', icon: Brain, id: 'models' },
   { name: 'Settings', icon: Settings, id: 'settings' },
 ]

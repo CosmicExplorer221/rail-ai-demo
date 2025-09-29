@@ -82,7 +82,8 @@ export function Review() {
   const [videoFps] = useState('30 fps')
   const [showTimelineEvents, setShowTimelineEvents] = useState(false) // Toggle for showing events on timeline
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set()) // Active event type filters
-  
+  const [sortBy, setSortBy] = useState<'time' | 'type'>('time') // Sorting method
+
   // Get route definition for current video
   const currentRoute = useMemo(() => getRouteForVideo(currentVideoFile), [currentVideoFile])
   
@@ -132,24 +133,36 @@ export function Review() {
     })
   }
 
-  // Sort events chronologically and calculate timeline positions
+  // Sort events by time or type and calculate timeline positions
   const sortedEvents = useMemo(() => {
-    const sorted = [...filteredEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    
-    // Calculate relative positions (0-100) based on time
+    let sorted: typeof filteredEvents
+
+    if (sortBy === 'time') {
+      sorted = [...filteredEvents].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    } else {
+      // Sort by event type first, then by time within each type
+      sorted = [...filteredEvents].sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type.localeCompare(b.type)
+        }
+        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      })
+    }
+
+    // Calculate relative positions (0-100) based on time for timeline
     if (sorted.length > 1) {
-      const firstTime = new Date(sorted[0].timestamp).getTime()
-      const lastTime = new Date(sorted[sorted.length - 1].timestamp).getTime()
+      const firstTime = Math.min(...sorted.map(e => new Date(e.timestamp).getTime()))
+      const lastTime = Math.max(...sorted.map(e => new Date(e.timestamp).getTime()))
       const timeRange = lastTime - firstTime || 1 // Avoid division by zero
-      
+
       return sorted.map(event => ({
         ...event,
         timelinePosition: ((new Date(event.timestamp).getTime() - firstTime) / timeRange) * 100
       }))
     }
-    
+
     return sorted.map(event => ({ ...event, timelinePosition: 50 }))
-  }, [filteredEvents])
+  }, [filteredEvents, sortBy])
 
 
   const handleClipSelection = (clip: any) => {
@@ -173,11 +186,160 @@ export function Review() {
         <p style={{marginTop: '0.5rem', fontSize: '1.125rem', color: '#4b5563'}}>Analyze detected events and validate AI predictions</p>
       </div>
 
-      {/* Main Layout Grid */}
-      <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem', marginBottom: '2rem'}}>
-        {/* Left Column - Event Timeline */}
+      {/* Event Table Section */}
+      <div className="card" style={{marginBottom: '2rem'}}>
+        <div className="p-6">
+          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+              <Eye style={{width: '1.25rem', height: '1.25rem', color: '#4b5563'}} />
+              <h3 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>All Events</h3>
+              <span style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                backgroundColor: '#f3f4f6',
+                padding: '0.25rem 0.75rem',
+                borderRadius: '9999px'
+              }}>
+                {sortedEvents.length} events
+              </span>
+            </div>
+          </div>
+
+          {/* Sorting Tabs */}
+          <div style={{display: 'flex', marginBottom: '1rem', borderBottom: '1px solid #e5e7eb'}}>
+            <button
+              onClick={() => setSortBy('time')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                borderBottom: sortBy === 'time' ? '2px solid #2563eb' : '2px solid transparent',
+                color: sortBy === 'time' ? '#2563eb' : '#6b7280',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (sortBy !== 'time') {
+                  e.currentTarget.style.color = '#374151'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (sortBy !== 'time') {
+                  e.currentTarget.style.color = '#6b7280'
+                }
+              }}
+            >
+              Time
+            </button>
+            <button
+              onClick={() => setSortBy('type')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                borderBottom: sortBy === 'type' ? '2px solid #2563eb' : '2px solid transparent',
+                color: sortBy === 'type' ? '#2563eb' : '#6b7280',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (sortBy !== 'type') {
+                  e.currentTarget.style.color = '#374151'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (sortBy !== 'type') {
+                  e.currentTarget.style.color = '#6b7280'
+                }
+              }}
+            >
+              Event Type
+            </button>
+          </div>
+
+          {/* Event Table */}
+          <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', maxHeight: '400px', overflowY: 'auto'}}>
+            {sortedEvents.map((event) => (
+              <button
+                key={event.id}
+                onClick={() => setSelectedEvent(event)}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid',
+                  borderColor: selectedEvent?.id === event.id ? '#bfdbfe' : 'transparent',
+                  backgroundColor: selectedEvent?.id === event.id ? '#eff6ff' : 'transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  fontSize: '0.875rem',
+                  fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedEvent?.id !== event.id) {
+                    e.currentTarget.style.backgroundColor = '#f9fafb'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedEvent?.id !== event.id) {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }
+                }}
+              >
+                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    color: '#6b7280',
+                    minWidth: '4rem'
+                  }}>
+                    {event.timestamp.split(' ')[1]}
+                  </span>
+                  <EventTypeChip type={event.type} />
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                    color: '#4b5563',
+                    backgroundColor: selectedEvent?.id === event.id ? '#dbeafe' : '#f3f4f6',
+                    padding: '0.125rem 0.375rem',
+                    borderRadius: '0.25rem',
+                    minWidth: '2.5rem',
+                    textAlign: 'center'
+                  }}>
+                    {(event.confidence * 100).toFixed(0)}%
+                  </span>
+                  <span style={{
+                    color: '#111827',
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {event.note}
+                  </span>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    color: '#9ca3af',
+                    minWidth: '4rem',
+                    textAlign: 'right'
+                  }}>
+                    #{event.frame}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Timeline and Map Section */}
+      <div style={{display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '2rem', marginBottom: '2rem'}}>
+        {/* Timeline Section */}
         <div>
-          {/* Timeline Scrubber */}
           <div className="card">
         <div className="p-6">
           <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
@@ -530,12 +692,29 @@ export function Review() {
               </span>
             </div>
           )}
+        </div>
           </div>
         </div>
 
-        {/* Right Column - Filters and Video Uploads */}
-        <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-          {/* Filters Section */}
+        {/* Map Section */}
+        <div>
+          {showMap && (
+            <Map
+              selectedEvent={selectedEvent}
+              onEventSelect={setSelectedEvent}
+              currentEvents={filteredEvents}
+              timelinePosition={timelinePosition}
+              videoFile={currentVideoFile}
+              isPlaying={timelineIsPlaying}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Filters and Video Uploads Section */}
+      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem'}}>
+        {/* Filters Section */}
+        <div>
           <div className="card">
             <div className="p-6">
               <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
@@ -625,8 +804,10 @@ export function Review() {
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Video Uploads Panel */}
+        {/* Video Uploads Panel */}
+        <div>
           <div className="card" style={{flex: 1}}>
             <div className="p-6">
               <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>Video Uploads</h3>
@@ -689,11 +870,11 @@ export function Review() {
                         transition: 'color 0.2s'
                       }} />
                     </div>
-                    
+
                     <p style={{
-                      fontSize: '0.875rem', 
-                      color: '#111827', 
-                      marginBottom: '0.5rem', 
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      marginBottom: '0.5rem',
                       fontWeight: '500',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -701,7 +882,7 @@ export function Review() {
                     }}>
                       {clip.name}
                     </p>
-                    
+
                     <div style={{display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#6b7280'}}>
                       <span>{clip.duration}</span>
                       <span>{clip.resolution}</span>
@@ -734,7 +915,7 @@ export function Review() {
                       Video Uploads ({videoClips.length} files)
                     </h4>
                     <p style={{fontSize: '0.875rem', color: '#4b5563', lineHeight: '1.4'}}>
-                      Select any completed video upload to view its detected events on the timeline and map. 
+                      Select any completed video upload to view its detected events on the timeline and map.
                       Only .mp4 files from the uploads section are shown.
                     </p>
                   </div>
@@ -745,20 +926,9 @@ export function Review() {
         </div>
       </div>
 
-      {/* Video and Map Section */}
-      <div style={{
-        display: 'grid', 
-        gridTemplateColumns: (() => {
-          const columns = []
-          if (showVideo) columns.push('3fr')
-          if (showMap) columns.push('2fr')  
-          return columns.join(' ') || '1fr'
-        })(),
-        gap: '2rem'
-      }}>
-        {/* Video Player Section */}
-        {showVideo && (
-        <div>
+      {/* Video Section */}
+      {showVideo && (
+        <div style={{marginBottom: '2rem'}}>
           <div className="card">
             <div className="p-6">
               <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
@@ -807,7 +977,7 @@ export function Review() {
                     <p style={{fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem'}}>Frame {selectedEvent.frame} • {selectedEvent.timestamp}</p>
                   )}
                 </div>
-                
+
                 {/* ROI Overlay Chips */}
                 <div style={{position: 'absolute', top: '1rem', left: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
                   <span style={{
@@ -900,7 +1070,7 @@ export function Review() {
                     <RotateCcw style={{width: '1.25rem', height: '1.25rem'}} />
                   </button>
                 </div>
-                
+
                 <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
                   <div style={{
                     display: 'flex',
@@ -974,102 +1144,7 @@ export function Review() {
             </div>
           </div>
         </div>
-        )}
-
-        {/* Map Section */}
-        {showMap && (
-          <div>
-            <Map 
-              selectedEvent={selectedEvent} 
-              onEventSelect={setSelectedEvent}
-              currentEvents={filteredEvents}
-              timelinePosition={timelinePosition}
-              videoFile={currentVideoFile}
-              isPlaying={timelineIsPlaying}
-            />
-            
-            {/* Event List Below Map */}
-            <div className="card" style={{ marginTop: '2rem' }}>
-              <div className="p-6">
-                <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>All Events</h3>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', maxHeight: '500px', overflowY: 'auto'}}>
-                  {sortedEvents.map((event) => (
-                    <button
-                      key={event.id}
-                      onClick={() => setSelectedEvent(event)}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        padding: '0.5rem 0.75rem',
-                        borderRadius: '0.375rem',
-                        border: '1px solid',
-                        borderColor: selectedEvent?.id === event.id ? '#bfdbfe' : 'transparent',
-                        backgroundColor: selectedEvent?.id === event.id ? '#eff6ff' : 'transparent',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        fontSize: '0.875rem',
-                        fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (selectedEvent?.id !== event.id) {
-                          e.currentTarget.style.backgroundColor = '#f9fafb'
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (selectedEvent?.id !== event.id) {
-                          e.currentTarget.style.backgroundColor = 'transparent'
-                        }
-                      }}
-                    >
-                      <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          color: '#6b7280',
-                          minWidth: '4rem'
-                        }}>
-                          {event.timestamp.split(' ')[1]}
-                        </span>
-                        <EventTypeChip type={event.type} />
-                        <span style={{
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          color: '#4b5563',
-                          backgroundColor: selectedEvent?.id === event.id ? '#dbeafe' : '#f3f4f6',
-                          padding: '0.125rem 0.375rem',
-                          borderRadius: '0.25rem',
-                          minWidth: '2.5rem',
-                          textAlign: 'center'
-                        }}>
-                          {(event.confidence * 100).toFixed(0)}%
-                        </span>
-                        <span style={{
-                          color: '#111827',
-                          flex: 1,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {event.note}
-                        </span>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          color: '#9ca3af',
-                          minWidth: '4rem',
-                          textAlign: 'right'
-                        }}>
-                          #{event.frame}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      </div>
+      )}
 
     </div>
   )

@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react'
-import { 
+import {
   AlertTriangle, Eye, Clock, ChevronRight, Filter, Calendar,
   Train, Zap, Shield, Activity, TrendingUp, Users, MapPin, Gauge
 } from 'lucide-react'
 import { mockEvents } from '../data/mockData'
+import { LineAssetsOverview } from './LineAssetsOverview'
+import { LineEquipmentDetails } from './LineEquipmentDetails'
 
 
 function EventTypeChip({ type }: { type: string }) {
@@ -237,14 +239,14 @@ export function Dashboard() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p style={{marginTop: '0.5rem', fontSize: '1.125rem', color: '#4b5563'}}>Real-time railway safety monitoring</p>
+    <div style={{ padding: '1rem' }}>
+      <div style={{ marginBottom: '1rem' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#111827', marginBottom: '0.25rem' }}>Dashboard</h1>
+        <p style={{ fontSize: '0.875rem', color: '#4b5563' }}>Real-time railway safety monitoring</p>
       </div>
 
       {/* Filters Section */}
-      <div className="mb-6">
+      <div style={{ marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <button
@@ -272,7 +274,7 @@ export function Dashboard() {
                 e.currentTarget.style.borderColor = '#e5e7eb'
               }}
             >
-              <Filter style={{ width: '1rem', height: '1rem' }} />
+              <Filter style={{ width: '1rem', height: '1rem', color: '#6b7280' }} />
               Filters
             </button>
             <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
@@ -309,8 +311,8 @@ export function Dashboard() {
         {/* Expandable Filter Panel */}
         {showFilters && (
           <div className="card" style={{ marginBottom: '0' }}>
-            <div style={{ padding: '1.5rem' }}>
-              <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ padding: '1rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
                 <h4 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>
                   Event Types
                 </h4>
@@ -417,57 +419,57 @@ export function Dashboard() {
       </div>
 
       {/* KPI Islands Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
         {Object.entries(kpiGroups).map(([groupName, kpis]) => (
           <div key={groupName} className="card">
-            <div className="p-6">
+            <div style={{ padding: '1rem' }}>
               {/* Group Header */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ 
-                  fontSize: '1.125rem', 
-                  fontWeight: '600', 
+              <div style={{ marginBottom: '0.75rem' }}>
+                <h3 style={{
+                  fontSize: '1rem',
+                  fontWeight: '600',
                   color: '#111827',
-                  marginBottom: '0.5rem'
+                  marginBottom: '0.25rem'
                 }}>
                   {groupName}
                 </h3>
-                <div style={{ 
-                  height: '2px', 
-                  width: '2.5rem', 
+                <div style={{
+                  height: '2px',
+                  width: '2rem',
                   backgroundColor: '#2563eb',
                   borderRadius: '1px'
                 }} />
               </div>
-              
+
               {/* KPI Items */}
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {kpis.map((kpi) => {
                   const Icon = kpi.icon
                   return (
                     <div key={kpi.name} style={{
                       display: 'flex',
                       alignItems: 'center',
-                      padding: '0.75rem',
+                      padding: '0.5rem',
                       backgroundColor: '#f9fafb',
-                      borderRadius: '0.5rem',
+                      borderRadius: '0.375rem',
                       border: '1px solid #f3f4f6'
                     }}>
                       <div style={{
                         flexShrink: 0,
-                        padding: '0.5rem',
-                        borderRadius: '0.5rem',
-                        backgroundColor: kpi.bgColor
+                        padding: '0.375rem',
+                        borderRadius: '0.375rem',
+                        backgroundColor: '#f8fafc'
                       }}>
-                        <Icon style={{width: '1.25rem', height: '1.25rem', color: kpi.color}} />
+                        <Icon style={{width: '1rem', height: '1rem', color: '#6b7280'}} />
                       </div>
-                      <div style={{marginLeft: '0.75rem', flex: '1 1 0%'}}>
-                        <div style={{fontSize: '0.75rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.125rem'}}>
+                      <div style={{marginLeft: '0.5rem', flex: '1 1 0%'}}>
+                        <div style={{fontSize: '0.7rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.0625rem'}}>
                           {kpi.name}
                         </div>
-                        <div style={{fontSize: '1.25rem', fontWeight: '700', color: '#111827', marginBottom: '0.125rem'}}>
+                        <div style={{fontSize: '1rem', fontWeight: '700', color: '#111827', marginBottom: '0.0625rem'}}>
                           {kpi.value}
                         </div>
-                        <div style={{fontSize: '0.625rem', color: '#4b5563'}}>{kpi.change}</div>
+                        <div style={{fontSize: '0.6rem', color: '#4b5563'}}>{kpi.change}</div>
                       </div>
                     </div>
                   )
@@ -478,31 +480,36 @@ export function Dashboard() {
         ))}
       </div>
 
-      {/* Recent Events */}
-      <div className="card">
-        <div className="p-6">
-          <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>Recent Events</h3>
+      {/* Line Information and Events Section - 3 Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <LineAssetsOverview />
+        <LineEquipmentDetails />
+
+        {/* Recent Events */}
+        <div className="card">
+        <div style={{ padding: '1rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#111827', marginBottom: '0.75rem' }}>Recent Events</h3>
           {recentEvents.length === 0 ? (
             <div style={{
               textAlign: 'center',
-              padding: '3rem 2rem',
+              padding: '2rem 1rem',
               color: '#6b7280'
             }}>
               <Eye style={{
-                width: '3rem',
-                height: '3rem',
-                color: '#d1d5db',
-                margin: '0 auto 1rem'
+                width: '2rem',
+                height: '2rem',
+                color: '#6b7280',
+                margin: '0 auto 0.5rem'
               }} />
               <h4 style={{
-                fontSize: '1.125rem',
+                fontSize: '1rem',
                 fontWeight: '500',
                 color: '#374151',
-                marginBottom: '0.5rem'
+                marginBottom: '0.25rem'
               }}>
                 No events found
               </h4>
-              <p style={{ fontSize: '0.875rem' }}>
+              <p style={{ fontSize: '0.8rem' }}>
                 {selectedEventTypes.size === 0 
                   ? 'No event types selected. Please select at least one event type to view events.'
                   : `No events found for the selected time range (${timeRanges.find(r => r.id === selectedTimeRange)?.label}).`
@@ -512,14 +519,14 @@ export function Dashboard() {
                 <button
                   onClick={() => setSelectedEventTypes(new Set(['RED_SIGNAL', 'PERSON_IN_TRACK', 'OBSTACLE', 'SPEED_LIMIT', 'WARNING']))}
                   style={{
-                    marginTop: '1rem',
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.875rem',
+                    marginTop: '0.5rem',
+                    padding: '0.375rem 0.75rem',
+                    fontSize: '0.8rem',
                     fontWeight: '500',
                     color: '#2563eb',
                     backgroundColor: 'transparent',
                     border: '1px solid #2563eb',
-                    borderRadius: '0.375rem',
+                    borderRadius: '0.25rem',
                     cursor: 'pointer',
                     transition: 'all 0.2s'
                   }}
@@ -545,11 +552,11 @@ export function Dashboard() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '1rem',
+                    padding: '0.5rem',
                     borderTop: index === 0 ? 'none' : '1px solid #f3f4f6',
                     cursor: 'pointer',
                     transition: 'background-color 0.2s',
-                    borderRadius: index === 0 ? '0.5rem 0.5rem 0 0' : index === recentEvents.length - 1 ? '0 0 0.5rem 0.5rem' : '0'
+                    borderRadius: index === 0 ? '0.375rem 0.375rem 0 0' : index === recentEvents.length - 1 ? '0 0 0.375rem 0.375rem' : '0'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -558,33 +565,33 @@ export function Dashboard() {
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    minWidth: '140px',
-                    marginRight: '1rem'
+                    minWidth: '100px',
+                    marginRight: '0.5rem'
                   }}>
-                    <Clock style={{width: '1rem', height: '1rem', color: '#9ca3af', marginRight: '0.5rem'}} />
-                    <span style={{fontSize: '0.875rem', color: '#6b7280', fontFamily: 'monospace'}}>
+                    <Clock style={{width: '0.875rem', height: '0.875rem', color: '#6b7280', marginRight: '0.375rem'}} />
+                    <span style={{fontSize: '0.75rem', color: '#6b7280', fontFamily: 'monospace'}}>
                       {new Date(event.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
 
                   {/* Event info */}
                   <div style={{flex: '1', minWidth: '0'}}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem'}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.125rem'}}>
                       <EventTypeChip type={event.type} />
                       <span style={{
-                        fontSize: '0.75rem',
+                        fontSize: '0.7rem',
                         fontWeight: '600',
                         backgroundColor: '#f3f4f6',
                         color: '#4b5563',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.25rem'
+                        padding: '0.1875rem 0.375rem',
+                        borderRadius: '0.1875rem'
                       }}>
                         {(event.confidence * 100).toFixed(0)}%
                       </span>
                     </div>
                     <p style={{
-                      fontSize: '0.875rem', 
-                      color: '#1f2937', 
+                      fontSize: '0.8rem',
+                      color: '#1f2937',
                       fontWeight: '500',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -596,22 +603,22 @@ export function Dashboard() {
 
                   {/* Arrow indicator */}
                   <ChevronRight style={{
-                    width: '1.25rem', 
-                    height: '1.25rem', 
-                    color: '#d1d5db',
-                    marginLeft: '1rem',
+                    width: '1rem',
+                    height: '1rem',
+                    color: '#6b7280',
+                    marginLeft: '0.5rem',
                     flexShrink: 0
                   }} />
                 </div>
                 ))}
               </div>
-              <div style={{marginTop: '1.5rem', textAlign: 'center'}}>
+              <div style={{marginTop: '0.75rem', textAlign: 'center'}}>
                 <button style={{
-                  padding: '0.75rem 1.5rem',
-                  fontSize: '0.875rem',
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.8rem',
                   color: '#2563eb',
                   fontWeight: '500',
-                  borderRadius: '0.5rem',
+                  borderRadius: '0.375rem',
                   border: '1px solid #2563eb',
                   backgroundColor: 'transparent',
                   cursor: 'pointer',
@@ -625,11 +632,12 @@ export function Dashboard() {
                   e.currentTarget.style.color = '#2563eb'
                   e.currentTarget.style.backgroundColor = 'transparent'
                 }}>
-                  View all {filteredEvents.length} events →
+                  View all {filteredEvents.length} events
                 </button>
               </div>
             </>
           )}
+        </div>
         </div>
       </div>
     </div>
