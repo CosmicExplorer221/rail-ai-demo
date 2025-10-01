@@ -3,6 +3,10 @@ import { Play, Square, RotateCcw, ChevronRight, Calendar, Eye, EyeOff, Map as Ma
 import { mockEvents, videoDatasets, mockUploadBatches, getRouteForVideo, type EventData } from '../data/mockData'
 import { Map } from './Map'
 import { useTicker } from '../hooks/useTicker'
+import { useRailwayAssets } from '../hooks/useRailwayAssets'
+import { getAssetIcon, getAssetColor, UK_BOUNDS } from '../services/overpassApi'
+import { getAvailableAssetTypes, getAssetTypeCounts } from '../services/availableAssetTypes'
+import { loadLocalUKAssets } from '../services/ukAssetDownloader'
 
 function EventTypeChip({ type }: { type: string }) {
   const getChipStyle = (type: string) => {
@@ -83,9 +87,64 @@ export function Review() {
   const [showTimelineEvents, setShowTimelineEvents] = useState(false) // Toggle for showing events on timeline
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set()) // Active event type filters
   const [sortBy, setSortBy] = useState<'time' | 'type'>('time') // Sorting method
+  const [filterTab, setFilterTab] = useState<'events' | 'assets'>('events') // Filter tab selection
+  const [activeAssetTypes, setActiveAssetTypes] = useState<Set<string>>(new Set()) // Active railway asset filters - default deselected
+  const [viewType, setViewType] = useState<'events' | 'assets'>('events') // View type for All Events section
+  const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set()) // Track expanded asset rows
+
 
   // Get route definition for current video
   const currentRoute = useMemo(() => getRouteForVideo(currentVideoFile), [currentVideoFile])
+
+  // Get available asset types from the local dataset
+  const availableAssetTypes = useMemo(() => getAvailableAssetTypes(), [])
+  const assetTypeCounts = useMemo(() => getAssetTypeCounts(), [])
+  const downloadedAssets = useMemo(() => loadLocalUKAssets() || [], [])
+
+  // Fetch railway assets for the Map only (filters control what shows on map)
+  const {
+    assets: railwayAssets,
+    loading: assetsLoading,
+    error: assetsError
+  } = useRailwayAssets({
+    enabled: activeAssetTypes.size > 0, // Only fetch when filters are selected for map display
+    assetTypes: Array.from(activeAssetTypes) as ('signals' | 'levelCrossings' | 'stations' | 'platforms' | 'bufferStops')[],
+    boundingBox: UK_BOUNDS
+  })
+
+  // Asset summary calculation
+  const assetSummary = useMemo(() => {
+    if (!railwayAssets.length) return {}
+
+    const summary: Record<string, { count: number; status: 'ok' | 'warning' | 'critical'; details: string }> = {}
+
+    railwayAssets.forEach(asset => {
+      const type = asset.type
+      if (!summary[type]) {
+        summary[type] = { count: 0, status: 'ok', details: '' }
+      }
+      summary[type].count++
+
+      // Determine status based on asset type and tags
+      if (type === 'signal' && !asset.tags['railway:signal:main']) {
+        summary[type].status = 'warning'
+      } else if (type === 'level_crossing' && !asset.tags.barrier) {
+        summary[type].status = 'critical'
+      } else if (type === 'switch' && !asset.tags.operator) {
+        summary[type].status = 'warning'
+      } else if (type === 'derail') {
+        summary[type].status = 'critical'
+      }
+    })
+
+    // Add details for each type
+    Object.keys(summary).forEach(type => {
+      const count = summary[type].count
+      summary[type].details = `${count} ${type.replace('_', ' ')}${count !== 1 ? 's' : ''}`
+    })
+
+    return summary
+  }, [railwayAssets])
   
   // Timeline animation using the custom hook
   useTicker(timelineIsPlaying, (deltaTime) => {
@@ -114,6 +173,7 @@ export function Review() {
       }))
   }, [])
 
+
   // Filter events based on active filters
   const filteredEvents = useMemo(() => {
     if (activeFilters.size === 0) return currentEvents
@@ -130,6 +190,32 @@ export function Review() {
         newFilters.add(filterName)
       }
       return newFilters
+    })
+  }
+
+  // Handle asset expansion toggle
+  const handleAssetToggle = (assetId: string) => {
+    setExpandedAssets(prev => {
+      const newExpanded = new Set(prev)
+      if (newExpanded.has(assetId)) {
+        newExpanded.delete(assetId)
+      } else {
+        newExpanded.add(assetId)
+      }
+      return newExpanded
+    })
+  }
+
+  // Handle asset type toggle
+  const handleAssetTypeToggle = (assetType: string) => {
+    setActiveAssetTypes(prev => {
+      const newTypes = new Set(prev)
+      if (newTypes.has(assetType)) {
+        newTypes.delete(assetType)
+      } else {
+        newTypes.add(assetType)
+      }
+      return newTypes
     })
   }
 
@@ -192,7 +278,9 @@ export function Review() {
           <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
             <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
               <Eye style={{width: '1.25rem', height: '1.25rem', color: '#4b5563'}} />
-              <h3 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>All Events</h3>
+              <h3 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>
+                {viewType === 'events' ? 'All Events' : 'Railway Assets'}
+              </h3>
               <span style={{
                 fontSize: '0.875rem',
                 color: '#6b7280',
@@ -200,15 +288,15 @@ export function Review() {
                 padding: '0.25rem 0.75rem',
                 borderRadius: '9999px'
               }}>
-                {sortedEvents.length} events
+                {viewType === 'events' ? `${sortedEvents.length} events` : assetsLoading ? 'Loading...' : `${railwayAssets.length} assets`}
               </span>
             </div>
           </div>
 
-          {/* Sorting Tabs */}
+          {/* View Type and Sorting Tabs */}
           <div style={{display: 'flex', marginBottom: '1rem', borderBottom: '1px solid #e5e7eb'}}>
             <button
-              onClick={() => setSortBy('time')}
+              onClick={() => setViewType('events')}
               style={{
                 padding: '0.75rem 1.5rem',
                 fontSize: '0.875rem',
@@ -216,25 +304,25 @@ export function Review() {
                 border: 'none',
                 backgroundColor: 'transparent',
                 cursor: 'pointer',
-                borderBottom: sortBy === 'time' ? '2px solid #2563eb' : '2px solid transparent',
-                color: sortBy === 'time' ? '#2563eb' : '#6b7280',
+                borderBottom: viewType === 'events' ? '2px solid #2563eb' : '2px solid transparent',
+                color: viewType === 'events' ? '#2563eb' : '#6b7280',
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                if (sortBy !== 'time') {
+                if (viewType !== 'events') {
                   e.currentTarget.style.color = '#374151'
                 }
               }}
               onMouseLeave={(e) => {
-                if (sortBy !== 'time') {
+                if (viewType !== 'events') {
                   e.currentTarget.style.color = '#6b7280'
                 }
               }}
             >
-              Time
+              Events
             </button>
             <button
-              onClick={() => setSortBy('type')}
+              onClick={() => setViewType('assets')}
               style={{
                 padding: '0.75rem 1.5rem',
                 fontSize: '0.875rem',
@@ -242,97 +330,388 @@ export function Review() {
                 border: 'none',
                 backgroundColor: 'transparent',
                 cursor: 'pointer',
-                borderBottom: sortBy === 'type' ? '2px solid #2563eb' : '2px solid transparent',
-                color: sortBy === 'type' ? '#2563eb' : '#6b7280',
+                borderBottom: viewType === 'assets' ? '2px solid #2563eb' : '2px solid transparent',
+                color: viewType === 'assets' ? '#2563eb' : '#6b7280',
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                if (sortBy !== 'type') {
+                if (viewType !== 'assets') {
                   e.currentTarget.style.color = '#374151'
                 }
               }}
               onMouseLeave={(e) => {
-                if (sortBy !== 'type') {
+                if (viewType !== 'assets') {
                   e.currentTarget.style.color = '#6b7280'
                 }
               }}
             >
-              Event Type
+              Assets
             </button>
-          </div>
 
-          {/* Event Table */}
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', maxHeight: '400px', overflowY: 'auto'}}>
-            {sortedEvents.map((event) => (
-              <button
-                key={event.id}
-                onClick={() => setSelectedEvent(event)}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid',
-                  borderColor: selectedEvent?.id === event.id ? '#bfdbfe' : 'transparent',
-                  backgroundColor: selectedEvent?.id === event.id ? '#eff6ff' : 'transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  fontSize: '0.875rem',
-                  fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace'
-                }}
-                onMouseEnter={(e) => {
-                  if (selectedEvent?.id !== event.id) {
-                    e.currentTarget.style.backgroundColor = '#f9fafb'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedEvent?.id !== event.id) {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }
-                }}
-              >
-                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                  <span style={{
-                    fontSize: '0.75rem',
-                    color: '#6b7280',
-                    minWidth: '4rem'
-                  }}>
-                    {event.timestamp.split(' ')[1]}
-                  </span>
-                  <EventTypeChip type={event.type} />
-                  <span style={{
+            {/* Sorting Tabs - only show for Events */}
+            {viewType === 'events' && (
+              <>
+                <div style={{width: '1px', backgroundColor: '#e5e7eb', margin: '0.5rem 1rem'}} />
+                <button
+                  onClick={() => setSortBy('time')}
+                  style={{
+                    padding: '0.75rem 1rem',
                     fontSize: '0.75rem',
                     fontWeight: '500',
-                    color: '#4b5563',
-                    backgroundColor: selectedEvent?.id === event.id ? '#dbeafe' : '#f3f4f6',
-                    padding: '0.125rem 0.375rem',
-                    borderRadius: '0.25rem',
-                    minWidth: '2.5rem',
-                    textAlign: 'center'
-                  }}>
-                    {(event.confidence * 100).toFixed(0)}%
-                  </span>
-                  <span style={{
-                    color: '#111827',
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {event.note}
-                  </span>
-                  <span style={{
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                    borderBottom: sortBy === 'time' ? '2px solid #10b981' : '2px solid transparent',
+                    color: sortBy === 'time' ? '#10b981' : '#9ca3af',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Time
+                </button>
+                <button
+                  onClick={() => setSortBy('type')}
+                  style={{
+                    padding: '0.75rem 1rem',
                     fontSize: '0.75rem',
-                    color: '#9ca3af',
-                    minWidth: '4rem',
-                    textAlign: 'right'
-                  }}>
-                    #{event.frame}
-                  </span>
-                </div>
-              </button>
-            ))}
+                    fontWeight: '500',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                    borderBottom: sortBy === 'type' ? '2px solid #10b981' : '2px solid transparent',
+                    color: sortBy === 'type' ? '#10b981' : '#9ca3af',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Event Type
+                </button>
+              </>
+            )}
           </div>
+
+          {/* Content Tables */}
+          {viewType === 'events' ? (
+            /* Event Table - Minimalistic Data Analysis Style */
+            <div style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.375rem',
+              overflow: 'hidden',
+              backgroundColor: '#ffffff'
+            }}>
+              {/* Table Header */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 120px 80px 80px 100px 80px',
+                backgroundColor: '#f8fafc',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#475569',
+                padding: '0.75rem 1rem',
+                borderBottom: '1px solid #e2e8f0',
+                textTransform: 'uppercase',
+                letterSpacing: '0.025em'
+              }}>
+                <div>Description</div>
+                <div style={{textAlign: 'center'}}>Type</div>
+                <div style={{textAlign: 'center'}}>Time</div>
+                <div style={{textAlign: 'center'}}>Conf.</div>
+                <div style={{textAlign: 'center'}}>Frame</div>
+                <div style={{textAlign: 'center'}}>Action</div>
+              </div>
+
+              {/* Table Body */}
+              <div style={{maxHeight: '400px', overflowY: 'auto'}}>
+                {sortedEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 120px 80px 80px 100px 80px',
+                      fontSize: '0.875rem',
+                      padding: '0.625rem 1rem',
+                      borderBottom: '1px solid #f1f5f9',
+                      backgroundColor: selectedEvent?.id === event.id ? '#f0f9ff' : '#ffffff',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.1s'
+                    }}
+                    onClick={() => setSelectedEvent(event)}
+                    onMouseEnter={(e) => {
+                      if (selectedEvent?.id !== event.id) {
+                        e.currentTarget.style.backgroundColor = '#f8fafc'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedEvent?.id !== event.id) {
+                        e.currentTarget.style.backgroundColor = '#ffffff'
+                      }
+                    }}
+                  >
+                    <div style={{
+                      color: '#1e293b',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontSize: '0.875rem'
+                    }}>
+                      {event.note}
+                    </div>
+
+                    <div style={{textAlign: 'center'}}>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        padding: '0.125rem 0.5rem',
+                        borderRadius: '0.25rem',
+                        backgroundColor: '#f1f5f9',
+                        color: '#64748b',
+                        textTransform: 'uppercase'
+                      }}>
+                        {event.type.replace('_', ' ').split(' ')[0]}
+                      </span>
+                    </div>
+
+                    <div style={{
+                      textAlign: 'center',
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      fontFamily: 'ui-monospace, monospace'
+                    }}>
+                      {event.timestamp.split(' ')[1]}
+                    </div>
+
+                    <div style={{textAlign: 'center'}}>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        color: event.confidence > 0.8 ? '#059669' :
+                               event.confidence > 0.6 ? '#d97706' : '#dc2626'
+                      }}>
+                        {(event.confidence * 100).toFixed(0)}%
+                      </span>
+                    </div>
+
+                    <div style={{
+                      textAlign: 'center',
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      fontFamily: 'ui-monospace, monospace'
+                    }}>
+                      #{event.frame}
+                    </div>
+
+                    <div style={{textAlign: 'center'}}>
+                      <button
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          color: '#2563eb',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.25rem',
+                          transition: 'background-color 0.1s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#eff6ff'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedEvent(event)
+                        }}
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* Railway Assets Table */
+            <div style={{ padding: '1rem 0' }}>
+              <div style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: '0.5rem',
+                overflow: 'hidden',
+                backgroundColor: '#ffffff'
+              }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                      <th style={{ padding: '0.5rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Asset Type</th>
+                      <th style={{ padding: '0.5rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>ID</th>
+                      <th style={{ padding: '0.5rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
+                      <th style={{ padding: '0.5rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Reliability</th>
+                      <th style={{ padding: '0.5rem 1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>File Size</th>
+                      <th style={{ padding: '0.5rem 1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      {
+                        type: 'Signals', icon: '●', id: 'SIG-001', status: 'Warning', reliability: 87, fileSize: '2.1 MB', count: 24, expandable: true,
+                        items: [
+                          { id: 'SIG-001-A', status: 'Warning', reliability: 82 },
+                          { id: 'SIG-001-B', status: 'None', reliability: 94 },
+                          { id: 'SIG-001-C', status: 'Warning', reliability: 85 }
+                        ]
+                      },
+                      { type: 'Switches', icon: '◆', id: 'SW-045', status: 'Warning', reliability: 92, fileSize: '1.8 MB', count: 18, expandable: true,
+                        items: [
+                          { id: 'SW-045-A', status: 'Warning', reliability: 89 },
+                          { id: 'SW-045-B', status: 'None', reliability: 96 }
+                        ]
+                      },
+                      { type: 'Level Crossings', icon: '▲', id: 'LC-012', status: 'Low', reliability: 95, fileSize: '950 kB', count: 8, expandable: false },
+                      { type: 'Mileposts', icon: '■', id: 'MP-234', status: 'None', reliability: 98, fileSize: '450 kB', count: 156, expandable: false },
+                      { type: 'Stations', icon: '▶', id: 'STN-007', status: 'Warning', reliability: 84, fileSize: '12.5 MB', count: 12, expandable: true,
+                        items: [
+                          { id: 'STN-007-A', status: 'Warning', reliability: 78 },
+                          { id: 'STN-007-B', status: 'None', reliability: 91 }
+                        ]
+                      },
+                      { type: 'Platforms', icon: '▬', id: 'PLT-089', status: 'None', reliability: 96, fileSize: '3.2 MB', count: 36, expandable: false },
+                      { type: 'Buffer Stops', icon: '◉', id: 'BS-003', status: 'Low', reliability: 89, fileSize: '850 kB', count: 6, expandable: false },
+                      { type: 'Derails', icon: '⬟', id: 'DR-016', status: 'None', reliability: 97, fileSize: '720 kB', count: 4, expandable: false },
+                      { type: 'Crossings', icon: '✕', id: 'CR-028', status: 'Warning', reliability: 81, fileSize: '1.1 MB', count: 14, expandable: true,
+                        items: [
+                          { id: 'CR-028-A', status: 'Warning', reliability: 76 },
+                          { id: 'CR-028-B', status: 'Low', reliability: 86 }
+                        ]
+                      },
+                      { type: 'Bridges', icon: '◄', id: 'BR-055', status: 'None', reliability: 94, fileSize: '8.7 MB', count: 22, expandable: false },
+                      { type: 'Tunnels', icon: '○', id: 'TN-009', status: 'Low', reliability: 88, fileSize: '6.3 MB', count: 9, expandable: false },
+                      { type: 'Yards', icon: '◘', id: 'YD-002', status: 'Warning', reliability: 79, fileSize: '45.2 MB', count: 3, expandable: true,
+                        items: [
+                          { id: 'YD-002-A', status: 'Warning', reliability: 73 },
+                          { id: 'YD-002-B', status: 'Low', reliability: 85 }
+                        ]
+                      },
+                      { type: 'Depots', icon: '◙', id: 'DP-004', status: 'None', reliability: 93, fileSize: '28.1 MB', count: 5, expandable: false },
+                      { type: 'Junctions', icon: '◐', id: 'JN-067', status: 'Low', reliability: 90, fileSize: '2.8 MB', count: 31, expandable: true,
+                        items: [
+                          { id: 'JN-067-A', status: 'Low', reliability: 87 },
+                          { id: 'JN-067-B', status: 'None', reliability: 93 }
+                        ]
+                      }
+                    ].flatMap((asset, index) => {
+                      const isExpanded = expandedAssets.has(asset.id)
+                      const rows = []
+
+                      // Main asset row
+                      rows.push(
+                        <tr key={asset.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {asset.expandable && (
+                              <button
+                                onClick={() => handleAssetToggle(asset.id)}
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: '#9ca3af',
+                                  cursor: 'pointer',
+                                  border: 'none',
+                                  background: 'none',
+                                  transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                                  transition: 'transform 0.2s'
+                                }}
+                              >
+                                ▶
+                              </button>
+                            )}
+                            <span style={{ fontSize: '0.875rem', color: '#6b7280', fontFamily: 'monospace' }}>{asset.icon}</span>
+                            <span style={{ fontSize: '0.875rem', color: '#111827', fontWeight: '500' }}>{asset.type}</span>
+                          </td>
+                          <td style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', color: '#6b7280', fontFamily: 'monospace' }}>
+                            {asset.id}
+                          </td>
+                          <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                            <span style={{
+                              fontSize: '0.75rem',
+                              fontWeight: '500',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '9999px',
+                              backgroundColor: asset.status === 'Warning' ? '#fef3c7' : asset.status === 'Low' ? '#fef3c7' : '#f3f4f6',
+                              color: asset.status === 'Warning' ? '#92400e' : asset.status === 'Low' ? '#92400e' : '#6b7280'
+                            }}>
+                              {asset.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                            <span style={{
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              color: asset.reliability >= 95 ? '#16a34a' : asset.reliability >= 85 ? '#d97706' : '#dc2626'
+                            }}>
+                              {asset.reliability}%
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontSize: '0.875rem', color: '#6b7280', fontFamily: 'monospace' }}>
+                            {asset.fileSize}
+                          </td>
+                          <td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>
+                            {asset.count}
+                          </td>
+                        </tr>
+                      )
+
+                      // Individual asset rows (when expanded)
+                      if (isExpanded && asset.items) {
+                        asset.items.forEach((item, itemIndex) => {
+                          rows.push(
+                            <tr key={item.id} style={{
+                              backgroundColor: '#f9fafb',
+                              borderBottom: itemIndex < asset.items!.length - 1 ? '1px solid #e5e7eb' : '1px solid #f3f4f6'
+                            }}>
+                              <td style={{ padding: '0.5rem 1rem 0.5rem 3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontFamily: 'monospace' }}>└</span>
+                                <span style={{ fontSize: '0.875rem', color: '#6b7280', fontFamily: 'monospace' }}>{asset.icon}</span>
+                                <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>{item.id}</span>
+                              </td>
+                              <td style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', color: '#9ca3af', fontFamily: 'monospace' }}>
+                                {item.id}
+                              </td>
+                              <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: '500',
+                                  padding: '0.25rem 0.75rem',
+                                  borderRadius: '9999px',
+                                  backgroundColor: item.status === 'Warning' ? '#fef3c7' : item.status === 'Low' ? '#fef3c7' : '#f3f4f6',
+                                  color: item.status === 'Warning' ? '#92400e' : item.status === 'Low' ? '#92400e' : '#6b7280'
+                                }}>
+                                  {item.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                                <span style={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: '600',
+                                  color: item.reliability >= 95 ? '#16a34a' : item.reliability >= 85 ? '#d97706' : '#dc2626'
+                                }}>
+                                  {item.reliability}%
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontSize: '0.875rem', color: '#9ca3af' }}>
+                                -
+                              </td>
+                              <td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontSize: '0.875rem', color: '#9ca3af' }}>
+                                1
+                              </td>
+                            </tr>
+                          )
+                        })
+                      }
+
+                      return rows
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -692,6 +1071,186 @@ export function Review() {
               </span>
             </div>
           )}
+
+          {/* Filters Section - Under Timeline */}
+          <div style={{marginTop: '1.5rem'}}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              marginBottom: '0.75rem',
+              paddingBottom: '0.75rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <h4 style={{fontSize: '0.875rem', fontWeight: '600', color: '#374151', margin: 0}}>
+                Filters
+              </h4>
+              <div style={{display: 'flex', gap: '0.25rem'}}>
+                <button
+                  onClick={() => setFilterTab('events')}
+                  style={{
+                    padding: '0.25rem 0.75rem',
+                    fontSize: '0.75rem',
+                    fontWeight: filterTab === 'events' ? '600' : '400',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '0.25rem',
+                    backgroundColor: filterTab === 'events' ? '#f1f5f9' : '#ffffff',
+                    color: filterTab === 'events' ? '#1e293b' : '#64748b',
+                    cursor: 'pointer',
+                    transition: 'all 0.1s'
+                  }}
+                >
+                  Events
+                </button>
+                <button
+                  onClick={() => setFilterTab('assets')}
+                  style={{
+                    padding: '0.25rem 0.75rem',
+                    fontSize: '0.75rem',
+                    fontWeight: filterTab === 'assets' ? '600' : '400',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '0.25rem',
+                    backgroundColor: filterTab === 'assets' ? '#f1f5f9' : '#ffffff',
+                    color: filterTab === 'assets' ? '#1e293b' : '#64748b',
+                    cursor: 'pointer',
+                    transition: 'all 0.1s'
+                  }}
+                >
+                  Assets
+                </button>
+              </div>
+            </div>
+
+            {/* Events Filter Content */}
+            {filterTab === 'events' && (
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem'}}>
+                {[
+                  { name: 'PERSON_IN_TRACK', displayName: 'Person Track' },
+                  { name: 'OBSTACLE', displayName: 'Obstruction' },
+                  { name: 'SIGNAL_GREEN', displayName: 'Green Signal' },
+                  { name: 'SIGNAL_YELLOW', displayName: 'Yellow Signal' },
+                  { name: 'RED_SIGNAL', displayName: 'Red Signal' },
+                  { name: 'BALISE', displayName: 'Balise Box' },
+                  { name: 'SPEED_LIMIT', displayName: 'Speed Board' },
+                  { name: 'SWITCH', displayName: 'Switch' },
+                  { name: 'WARNING', displayName: 'Crossing' }
+                ].map((filter) => {
+                  const isActive = activeFilters.has(filter.name)
+                  return (
+                    <button
+                      key={filter.name}
+                      onClick={() => handleFilterToggle(filter.name)}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        fontSize: '0.75rem',
+                        color: isActive ? '#1e293b' : '#64748b',
+                        backgroundColor: isActive ? '#f1f5f9' : '#ffffff',
+                        border: '1px solid',
+                        borderColor: isActive ? '#94a3b8' : '#e2e8f0',
+                        borderRadius: '0.25rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.1s',
+                        textAlign: 'center',
+                        fontWeight: isActive ? '500' : '400'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = '#f8fafc'
+                          e.currentTarget.style.borderColor = '#cbd5e1'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = '#ffffff'
+                          e.currentTarget.style.borderColor = '#e2e8f0'
+                        }
+                      }}
+                    >
+                      {filter.displayName}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Assets Filter Content */}
+            {filterTab === 'assets' && (
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.75rem', fontStyle: 'italic' }}>
+                  Asset filters control map visibility only
+                </div>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem'}}>
+                {[
+                  { name: 'signals', displayName: 'Signals' },
+                  { name: 'switches', displayName: 'Switches' },
+                  { name: 'levelCrossings', displayName: 'Level Crossings' },
+                  { name: 'stations', displayName: 'Stations' },
+                  { name: 'platforms', displayName: 'Platforms' },
+                  { name: 'bufferStops', displayName: 'Buffer Stops' },
+                  { name: 'crossings', displayName: 'Crossings' },
+                  { name: 'halts', displayName: 'Halts' },
+                  { name: 'tramStops', displayName: 'Tram Stops' },
+                  { name: 'subwayEntrances', displayName: 'Subway Entrances' },
+                  { name: 'turntables', displayName: 'Turntables' },
+                  { name: 'roundhouses', displayName: 'Roundhouses' },
+                  { name: 'waterCranes', displayName: 'Water Cranes' },
+                  { name: 'ventilationShafts', displayName: 'Ventilation Shafts' }
+                ].map((assetType) => {
+                  const isActive = activeAssetTypes.has(assetType.name)
+                  const count = assetTypeCounts[assetType.name] || 0
+                  const hasAssets = count > 0
+
+                  return (
+                    <button
+                      key={assetType.name}
+                      onClick={() => {
+                        if (hasAssets) {
+                          handleAssetTypeToggle(assetType.name)
+                        }
+                      }}
+                      disabled={!hasAssets}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        fontSize: '0.75rem',
+                        color: hasAssets
+                          ? (isActive ? '#1e293b' : '#64748b')
+                          : '#9ca3af',
+                        backgroundColor: hasAssets
+                          ? (isActive ? '#f1f5f9' : '#ffffff')
+                          : '#f9fafb',
+                        border: '1px solid',
+                        borderColor: hasAssets
+                          ? (isActive ? '#94a3b8' : '#e2e8f0')
+                          : '#e5e7eb',
+                        borderRadius: '0.25rem',
+                        cursor: hasAssets ? 'pointer' : 'not-allowed',
+                        opacity: hasAssets ? 1 : 0.5,
+                        transition: 'all 0.1s',
+                        textAlign: 'center',
+                        fontWeight: isActive ? '500' : '400'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive && hasAssets) {
+                          e.currentTarget.style.backgroundColor = '#f8fafc'
+                          e.currentTarget.style.borderColor = '#cbd5e1'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive && hasAssets) {
+                          e.currentTarget.style.backgroundColor = '#ffffff'
+                          e.currentTarget.style.borderColor = '#e2e8f0'
+                        }
+                      }}
+                      title={hasAssets ? `${assetType.displayName} (${count})` : `No ${assetType.displayName.toLowerCase()} available`}
+                    >
+                      {assetType.displayName} {hasAssets && `(${count})`}
+                    </button>
+                  )
+                })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
           </div>
         </div>
@@ -706,445 +1265,14 @@ export function Review() {
               timelinePosition={timelinePosition}
               videoFile={currentVideoFile}
               isPlaying={timelineIsPlaying}
+              activeAssetTypes={activeAssetTypes}
+              downloadedAssets={downloadedAssets}
+              useDownloadedAssets={true}
             />
           )}
         </div>
       </div>
 
-      {/* Filters and Video Uploads Section */}
-      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem'}}>
-        {/* Filters Section */}
-        <div>
-          <div className="card">
-            <div className="p-6">
-              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
-                <h4 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>Filters</h4>
-                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                  <span style={{fontSize: '0.875rem', color: '#6b7280'}}>
-                    {activeFilters.size > 0 ? `${activeFilters.size} active` : 'No filters'}
-                  </span>
-                  {activeFilters.size > 0 && (
-                    <button
-                      onClick={() => setActiveFilters(new Set())}
-                      style={{
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        color: '#dc2626',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textDecoration: 'underline'
-                      }}
-                    >
-                      Clear all
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem'}}>
-                {[
-                  { name: 'PERSON_IN_TRACK', displayName: 'person track', color: '#ea580c' },
-                  { name: 'OBSTACLE', displayName: 'track obstruction', color: '#d97706' },
-                  { name: 'SIGNAL_GREEN', displayName: 'signal aspect green', color: '#16a34a' },
-                  { name: 'SIGNAL_YELLOW', displayName: 'signal aspect yellow', color: '#d97706' },
-                  { name: 'RED_SIGNAL', displayName: 'signal aspect red', color: '#dc2626' },
-                  { name: 'BALISE', displayName: 'balise box', color: '#8b5cf6' },
-                  { name: 'SPEED_LIMIT', displayName: 'speed board', color: '#2563eb' },
-                  { name: 'SWITCH', displayName: 'switch', color: '#0891b2' },
-                  { name: 'WARNING', displayName: 'crossing', color: '#6b7280' }
-                ].map((filter) => {
-                  const isActive = activeFilters.has(filter.name)
-                  return (
-                    <button
-                      key={filter.name}
-                      onClick={() => handleFilterToggle(filter.name)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.75rem 1rem',
-                        fontSize: '0.875rem',
-                        color: isActive ? '#111827' : '#374151',
-                        backgroundColor: isActive ? '#eff6ff' : '#f9fafb',
-                        border: '2px solid',
-                        borderColor: isActive ? '#3b82f6' : '#e5e7eb',
-                        borderRadius: '0.375rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        textAlign: 'left',
-                        fontWeight: isActive ? '500' : '400'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = '#f3f4f6'
-                          e.currentTarget.style.borderColor = '#d1d5db'
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = '#f9fafb'
-                          e.currentTarget.style.borderColor = '#e5e7eb'
-                        }
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: '0.75rem',
-                          height: '0.75rem',
-                          borderRadius: '50%',
-                          backgroundColor: filter.color,
-                          flexShrink: 0,
-                          opacity: isActive ? 1 : 0.6
-                        }}
-                      />
-                      {filter.displayName}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Video Uploads Panel */}
-        <div>
-          <div className="card" style={{flex: 1}}>
-            <div className="p-6">
-              <h3 className="text-xl font-semibold text-gray-900" style={{marginBottom: '1.5rem'}}>Video Uploads</h3>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '500px', overflowY: 'auto'}}>
-                {videoClips.map((clip) => (
-                  <button
-                    key={clip.id}
-                    onClick={() => handleClipSelection(clip)}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '1rem',
-                      borderRadius: '0.75rem',
-                      border: '2px solid',
-                      borderColor: clip.name === currentVideoFile ? '#10b981' : '#e5e7eb',
-                      backgroundColor: clip.name === currentVideoFile ? '#f0fdf4' : 'transparent',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: clip.name === currentVideoFile ? '0 1px 3px 0 rgb(0 0 0 / 0.1)' : 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (clip.name !== currentVideoFile) {
-                        e.currentTarget.style.backgroundColor = '#f9fafb'
-                        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (clip.name !== currentVideoFile) {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                        e.currentTarget.style.boxShadow = 'none'
-                      }
-                    }}
-                  >
-                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem'}}>
-                      <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-                        <span style={{fontSize: '0.875rem', color: '#6b7280'}}>📹</span>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          color: 'white',
-                          backgroundColor: (() => {
-                            switch(clip.status) {
-                              case 'completed': return '#10b981'
-                              case 'processing': return '#f59e0b'
-                              case 'failed': return '#dc2626'
-                              default: return '#6b7280'
-                            }
-                          })(),
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '0.25rem',
-                          textTransform: 'capitalize'
-                        }}>
-                          {clip.status}
-                        </span>
-                      </div>
-                      <ChevronRight style={{
-                        width: '1rem',
-                        height: '1rem',
-                        color: clip.name === currentVideoFile ? '#10b981' : '#9ca3af',
-                        transition: 'color 0.2s'
-                      }} />
-                    </div>
-
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: '#111827',
-                      marginBottom: '0.5rem',
-                      fontWeight: '500',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {clip.name}
-                    </p>
-
-                    <div style={{display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#6b7280'}}>
-                      <span>{clip.duration}</span>
-                      <span>{clip.resolution}</span>
-                      <span>{clip.fps}</span>
-                      <span>{clip.size}</span>
-                    </div>
-                    <div style={{fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem'}}>
-                      Uploaded: {new Date(clip.uploadDate).toLocaleDateString()}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Heads up info */}
-              <div style={{
-                marginTop: '1.5rem',
-                padding: '1rem',
-                backgroundColor: '#f8fafc',
-                borderRadius: '0.5rem',
-                border: '1px solid #e2e8f0'
-              }}>
-                <div style={{display: 'flex', alignItems: 'flex-start', gap: '0.75rem'}}>
-                  <span style={{
-                    fontSize: '1.25rem',
-                    color: '#3b82f6',
-                    marginTop: '0.125rem'
-                  }}>ℹ️</span>
-                  <div>
-                    <h4 style={{fontSize: '0.875rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.25rem'}}>
-                      Video Uploads ({videoClips.length} files)
-                    </h4>
-                    <p style={{fontSize: '0.875rem', color: '#4b5563', lineHeight: '1.4'}}>
-                      Select any completed video upload to view its detected events on the timeline and map.
-                      Only .mp4 files from the uploads section are shown.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Video Section */}
-      {showVideo && (
-        <div style={{marginBottom: '2rem'}}>
-          <div className="card">
-            <div className="p-6">
-              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem'}}>
-                {selectedEvent ? (
-                  <>
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      Event: {selectedEvent.id} - Frame {selectedEvent.frame}
-                    </h3>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                      <EventTypeChip type={selectedEvent.type} />
-                      <span style={{
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        backgroundColor: '#eff6ff',
-                        color: '#1d4ed8',
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '9999px',
-                        border: '1px solid #bfdbfe'
-                      }}>
-                        {(selectedEvent.confidence * 100).toFixed(0)}% confidence
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <h3 className="text-xl font-semibold text-gray-900">
-                    No Event Selected
-                  </h3>
-                )}
-              </div>
-
-              {/* Video Placeholder */}
-              <div style={{
-                position: 'relative',
-                backgroundColor: '#111827',
-                borderRadius: '0.75rem',
-                aspectRatio: '16/9',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{textAlign: 'center'}}>
-                  <Play style={{width: '5rem', height: '5rem', color: '#9ca3af', margin: '0 auto 0.75rem'}} />
-                  <p style={{fontSize: '1.125rem', color: '#9ca3af', fontWeight: '500'}}>Event Video Playback</p>
-                  {selectedEvent && (
-                    <p style={{fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem'}}>Frame {selectedEvent.frame} • {selectedEvent.timestamp}</p>
-                  )}
-                </div>
-
-                {/* ROI Overlay Chips */}
-                <div style={{position: 'absolute', top: '1rem', left: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    backgroundColor: '#fef3c7',
-                    color: '#92400e',
-                    border: '1px solid #fde68a',
-                    boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                  }}>
-                    ROI #1: Signal Detection
-                  </span>
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    backgroundColor: '#dbeafe',
-                    color: '#1e40af',
-                    border: '1px solid #93c5fd',
-                    boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                  }}>
-                    ROI #2: Track Area
-                  </span>
-                </div>
-              </div>
-
-              {/* Video Controls */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: '#f9fafb',
-                borderRadius: '0.75rem',
-                padding: '1rem'
-              }}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-                  <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '3rem',
-                      height: '3rem',
-                      borderRadius: '50%',
-                      backgroundColor: '#2563eb',
-                      color: 'white',
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s',
-                      boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
-                  >
-                    {isPlaying ? (
-                      <Square style={{width: '1.25rem', height: '1.25rem'}} />
-                    ) : (
-                      <Play style={{width: '1.25rem', height: '1.25rem'}} />
-                    )}
-                  </button>
-                  <button style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '3rem',
-                    height: '3rem',
-                    borderRadius: '50%',
-                    border: '1px solid #d1d5db',
-                    color: '#4b5563',
-                    backgroundColor: 'transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white'
-                    e.currentTarget.style.boxShadow = '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }}>
-                    <RotateCcw style={{width: '1.25rem', height: '1.25rem'}} />
-                  </button>
-                </div>
-
-                <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    backgroundColor: 'white',
-                    borderRadius: '0.5rem',
-                    padding: '0.5rem 1rem',
-                    boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <label htmlFor="fps" style={{fontSize: '0.875rem', fontWeight: '500', color: '#374151'}}>
-                      FPS:
-                    </label>
-                    <input
-                      id="fps"
-                      type="range"
-                      min="1"
-                      max="60"
-                      value={fps}
-                      onChange={(e) => setFps(Number(e.target.value))}
-                      style={{width: '6rem'}}
-                    />
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      backgroundColor: '#dbeafe',
-                      color: '#1e40af',
-                      minWidth: '3rem'
-                    }}>
-                      {fps}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Event Details */}
-              <div style={{
-                marginTop: '2rem',
-                backgroundColor: '#f9fafb',
-                borderRadius: '0.75rem',
-                padding: '1.5rem'
-              }}>
-                <h4 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827', marginBottom: '1rem'}}>Event Details</h4>
-                {selectedEvent ? (
-                  <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem'}}>
-                    <div style={{backgroundColor: 'white', borderRadius: '0.5rem', padding: '1rem'}}>
-                      <dt style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.25rem'}}>Timestamp</dt>
-                      <dd style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>{selectedEvent.timestamp}</dd>
-                    </div>
-                    <div style={{backgroundColor: 'white', borderRadius: '0.5rem', padding: '1rem'}}>
-                      <dt style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.25rem'}}>Confidence</dt>
-                      <dd style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>{(selectedEvent.confidence * 100).toFixed(1)}%</dd>
-                    </div>
-                    <div style={{gridColumn: 'span 2', backgroundColor: 'white', borderRadius: '0.5rem', padding: '1rem'}}>
-                      <dt style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280', marginBottom: '0.25rem'}}>Description</dt>
-                      <dd style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>{selectedEvent.note}</dd>
-                    </div>
-                  </div>
-                ) : (
-                  <p style={{fontSize: '1rem', color: '#6b7280', fontStyle: 'italic'}}>
-                    Select an event to view details
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   )
